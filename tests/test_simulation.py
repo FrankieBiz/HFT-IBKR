@@ -87,3 +87,63 @@ class SimulationTests(unittest.TestCase):
         gate.reconcile({}, {}, [], [])
         snap = Snapshot(99900, {'DEMO': 1}, {'DEMO': (100, START), 'B': (100, START+timedelta(minutes=9))})
         self.assertEqual(gate.check('one', 'B', 1, 100, 0, snap, START+timedelta(minutes=9)), 'missing or stale mark')
+
+    def test_recovery_cannot_bypass_loss_limits(self):
+        gate = RiskGate(self.config())
+        gate.reconcile({}, {}, [], [])
+        gate.observe(Snapshot(100000, {}, {}), START)
+        breached = Snapshot(90000, {}, {'DEMO': (100, START)})
+        gate.observe(breached, START)
+        self.assertEqual(gate.state, 'HALTED')
+        gate.begin_recovery()
+        gate.reconcile({}, {}, [], [])
+        self.assertIsNotNone(gate.check('recovered', 'DEMO', 1, 100, 0, breached, START))
+        self.assertEqual(gate.state, 'HALTED')
+
+    def test_projected_overflow_and_invalid_existing_position(self):
+        gate = RiskGate(self.config())
+        gate.reconcile({}, {}, [], [])
+        snap = Snapshot(100000, {'DEMO': 2}, {'DEMO': (100, START)})
+        self.assertIsNotNone(gate.check('overflow', 'DEMO', -2, 1e308, 0, snap, START))
+        snap = Snapshot(100000, {'DEMO': True}, {'DEMO': (100, START)})
+        self.assertIsNotNone(gate.check('bool', 'DEMO', 1, 100, 0, snap, START))
+
+    def test_rejected_order_cancels_all_requested_shares(self):
+        result = simulate([bar(0, symbol='OTHER'), bar(1, symbol='OTHER')], self.config(), BuyOnce())
+        cancelled = [e for e in result['events'] if e['type'] == 'remainder_cancelled']
+        self.assertEqual(cancelled[0]['quantity'], 10)
+
+    def test_observation_halts_on_stale_held_mark(self):
+        gate = RiskGate(self.config())
+        gate.reconcile({}, {}, [], [])
+        gate.observe(Snapshot(99900, {'DEMO': 1}, {'DEMO': (100, START)}), START+timedelta(minutes=5))
+        self.assertEqual(gate.state, 'HALTED')
+
+    def test_public_bars_normalize_utc(self):
+        offset = timezone(timedelta(hours=5))
+        value = replace(bar(0), timestamp=START.astimezone(offset))
+        self.assertEqual(value.timestamp.tzinfo, timezone.utc)
+
+    def test_projection_limits_and_cash_competition(self):
+        config = replace(self.config(initial_cash=1500), sectors={'A': 'one', 'B': 'two'})
+        rows = [bar(i, symbol=s) for i in range(2) for s in ('A', 'B')]
+        result = simulate(rows, config, BuyOnce())
+        self.assertEqual(result['summary']['positions'], {'A': 10})
+        self.assertEqual(result['summary']['cash'], 500)
+        for limits, expected in [(replace(Limits(), max_symbol_notional=500), 'symbol exposure limit'),
+                                 (replace(Limits(), max_gross_notional=500), 'portfolio exposure limit'),
+                                 (replace(Limits(), max_sector_notional=500), 'sector exposure limit')]:
+            gate = RiskGate(replace(self.config(), limits=limits))
+            gate.reconcile({}, {}, [], [])
+            snap = Snapshot(100000, {}, {'DEMO': (100, START)})
+            self.assertEqual(gate.check('one', 'DEMO', 10, 100, 0, snap, START), expected)
+
+    def test_existing_marked_exposure_halts_without_order(self):
+        config = replace(self.config(), limits=replace(Limits(), max_symbol_notional=100),
+                         sectors={'A': 'one', 'B': 'two'})
+        gate = RiskGate(config)
+        gate.reconcile({}, {}, [], [])
+        snap = Snapshot(100000, {'A': 2}, {'A': (100, START), 'B': (1, START)})
+        gate.observe(snap, START)
+        self.assertEqual(gate.state, 'HALTED')
+        self.assertIsNotNone(gate.check('b', 'B', 1, 1, 0, snap, START))

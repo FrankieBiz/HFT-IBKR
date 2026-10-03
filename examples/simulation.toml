@@ -1,0 +1,30 @@
+# Illustrative assumptions, NOT a broker schedule or calibrated cost estimate.
+mode = "simulation"
+initial_cash = 100000.0
+interval_seconds = 60
+fast_window = 5
+slow_window = 20
+target_quantity = 100
+
+[sectors]
+DEMO = "synthetic"
+
+[costs]
+commission_per_share = 0.005
+minimum_commission = 1.0
+fee_bps = 0.1
+spread_bps = 2.0
+slippage_bps = 1.0
+impact_bps = 10.0
+
+[limits]
+max_order_quantity = 1000
+max_symbol_notional = 20000.0
+max_gross_notional = 50000.0
+max_net_notional = 50000.0
+max_sector_notional = 30000.0
+max_daily_loss_fraction = 0.02
+max_drawdown_fraction = 0.05
+max_price_jump_fraction = 0.10
+max_participation = 0.10
+max_mark_age_seconds = 120

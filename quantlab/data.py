@@ -38,6 +38,7 @@ class Bar:
     def __post_init__(self):
         if self.timestamp.tzinfo is None or self.timestamp.utcoffset() is None:
             raise ValueError('bar timestamp must be timezone aware')
+        object.__setattr__(self, 'timestamp', self.timestamp.astimezone(timezone.utc))
         if not self.symbol or not self.symbol.isascii() or any(c.isspace() for c in self.symbol):
             raise ValueError('symbol must be nonempty ASCII without whitespace')
         for name in ('open', 'high', 'low', 'close'):

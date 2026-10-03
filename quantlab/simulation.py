@@ -53,12 +53,14 @@ def simulate(bars: list[Bar], config: Config, strategy: Strategy | None = None) 
                 else:
                     capacity = int(bar.volume * config.limits.max_participation)
                     quantity = min(abs(requested), capacity) * (1 if requested > 0 else -1)
+                    executed = 0
                     if quantity:
                         price, fee = config.costs.execution(bar.close, quantity, bar.volume)
                         reason = risk.check(order_id, bar.symbol, quantity, price, fee, Snapshot(cash, positions, marks), now)
                         if reason:
                             events.append(dict(timestamp=now.isoformat(), type='rejected', order_id=order_id, reason=reason))
                         else:
+                            executed = quantity
                             cash -= quantity * price + fee
                             positions[bar.symbol] = positions.get(bar.symbol, 0) + quantity
                             if positions[bar.symbol] == 0:
@@ -70,7 +72,7 @@ def simulate(bars: list[Bar], config: Config, strategy: Strategy | None = None) 
                                               fee=fee, cost=cost, participation=abs(quantity)/bar.volume))
                             risk.observe(Snapshot(cash, positions, marks), now)
                     events.append(dict(timestamp=now.isoformat(), order_id=order_id, type='remainder_cancelled',
-                                       quantity=abs(requested)-abs(quantity)))
+                                       quantity=abs(requested)-abs(executed)))
             elif intent is not None:
                 events.append(dict(timestamp=now.isoformat(), type='cancelled', order_id=intent[0], reason=risk.reason))
             history.setdefault(bar.symbol, []).append(bar)
@@ -95,7 +97,8 @@ def simulate(bars: list[Bar], config: Config, strategy: Strategy | None = None) 
                         events.append(dict(timestamp=now.isoformat(), type='intent', order_id=order_id,
                                            symbol=bar.symbol, quantity=quantity))
         value = Snapshot(cash, positions, marks).equity()
-        equity.append(dict(timestamp=now.isoformat(), equity=value, cash=cash))
+        valuation_valid = all(0 <= (now - marks[s][1]).total_seconds() <= config.limits.max_mark_age_seconds for s in positions)
+        equity.append(dict(timestamp=now.isoformat(), equity=value, cash=cash, valuation_valid=valuation_valid))
     for order_id, _, _ in pending.values():
         events.append(dict(timestamp=now.isoformat(), type='cancelled', order_id=order_id, reason='end of dataset'))
     values = [config.initial_cash] + [row['equity'] for row in equity]
@@ -107,7 +110,9 @@ def simulate(bars: list[Bar], config: Config, strategy: Strategy | None = None) 
                 assumptions=['Synthetic full subsequent-bar fills booked at bar end using close plus costs.',
                              'No queue priority, limit orders, intrabar path or calibrated impact.',
                              'Long-only cash equities; no corporate actions, borrow, leverage or exchange calendar.',
-                             'Open inventory marked to last close; no forced end-of-run liquidation.'],
+                             'Open inventory marked to last close; no forced end-of-run liquidation.',
+                             'Simultaneous intents allocate cash in lexicographic symbol order.',
+                             'Stale portfolio marks halt execution; flagged equity uses last observed prices.'],
                 fills=fills, events=events, equity=equity,
                 returns=[values[i]/values[i-1]-1 for i in range(1, len(values))],
                 summary=dict(equity=values[-1], cash=cash, positions=positions,

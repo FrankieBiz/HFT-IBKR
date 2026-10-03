@@ -1,0 +1,7 @@
+{
+  "source": "Deterministic synthetic DEMO fixture, seed 17; not market data",
+  "adjustment": "none; no corporate actions in synthetic fixture",
+  "survivorship": "single synthetic instrument; no real universe claims",
+  "interval_seconds": 60,
+  "seed": 17
+}
