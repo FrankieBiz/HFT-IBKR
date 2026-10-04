@@ -1,6 +1,6 @@
 # HFT Repository Guidance
 
-This repository starts with an architecture plan, not an implemented trading system. Treat `docs/plans/optimize-quant-trading-system.md` as a proposal and source of requirements, not as verified technical, broker, legal, or financial guidance.
+This repository contains offline ETF research/evaluation and order-control simulators plus an architecture plan; it has no broker execution system. Treat `docs/plans/optimize-quant-trading-system.md` as a historical proposal, not as verified technical, broker, legal, or financial guidance. Use the current delivery plan and dated research/design notes for implementation scope.
 
 Before implementing any part of the plan:
 
