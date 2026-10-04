@@ -4,3 +4,4 @@ __pycache__/
 .research-output/
 dist/
 *.qdata
+.playwright-mcp/

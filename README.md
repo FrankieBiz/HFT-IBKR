@@ -27,7 +27,22 @@ and crash/restart artifacts. `summary.json` records the end-to-end result.
 The portable archive supports `python3 dist/quant-system.pyz research ...` and
 `python3 dist/quant-system.pyz control ...`; it can run outside this checkout.
 
-## Check the local AI workstation
+## Results dashboard
+
+The automatic demo generates `dashboard.html` alongside its reports. It is a
+self-contained read-only view of equity curves, cost scenarios, final holdings,
+source hashes, assumptions and synthetic control states. The cost buttons update
+stored results without rerunning a strategy. No external assets or broker calls.
+
+![Offline research dashboard on invented data](docs/images/offline-research-dashboard.png)
+
+The archive provides `view render --research REPORT --control CONTROL_REPORT
+--output NEW_HTML` (repeat `--control` as needed) and
+`view serve --page HTML --port 8765` to serve just that page on loopback. The
+dashboard is a snapshot, not a live account interface. Rejected configurations
+emit no final-state report; the demo still validates all 14 acceptance scenarios.
+
+## Local AI environment checks
 
 The diagnostic runs without installing Laya or downloading weights:
 
@@ -204,5 +219,7 @@ feature. This build cannot connect to a broker or submit actual orders.
 The local environment preflight tool is implemented. Laya inference/model
 benchmarking and a NautilusTrader compatibility study remain planned extensions.
 Neither model nor framework is installed or integrated; the trading build uses algorithms.
+Strict data intake and the read-only results dashboard are also implemented.
+Historical validation and broker integration remain outstanding.
 Broker account access, paper/live orders, paid services and deployment require
 separate explicit authorization.

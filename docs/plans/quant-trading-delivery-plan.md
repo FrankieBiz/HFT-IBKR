@@ -34,6 +34,7 @@ accepts only `simulation`; all other modes fail configuration validation.
 | H0: target-machine preflight | Environment diagnostic followed by isolated single-checkpoint Laya inference on RTX 3070 Ti | Actual CUDA/device/dtype, peak model memory with headroom, bounded-input timings and fallback/crash evidence | Environment diagnostic implemented; target GPU and model benchmark outstanding |
 | A1: optional local text features | Timestamped fixed-taxonomy classification, calibrated abstention and controlled price-only comparison | Frozen labels/rubric/model revision; classification baselines; financial ablation and prospective evidence if training cutoff unknown | Planned; Laya is not integrated and has no order authority |
 | F1: framework compatibility study | Pinned NautilusTrader offline replay and IBKR adapter design; ib_async fallback if necessary | P&L equivalence, version-matched API/docs, A01–A14 mapped to adapter behavior, license/dependency review | Planned; no framework adopted for operational use |
+| V1: offline results view | Self-contained chart/cost/provenance/control snapshot dashboard | Automated report rendering, keyboard/mobile browser checks, loopback route restrictions | Implemented and opened locally; read-only offline snapshot |
 | M4: paper adapter | Account-scoped adapter, pacing scheduler, durable journal, operator runbook | Authorized paper tests including reconnect, uncertain submission and cancel/fill races | Not started; requires separate authorization for account actions |
 | M5: live readiness review | Instrument-specific risk policy, regulatory applicability review, operational drills and budget | Reviewed evidence and explicit live authorization | Not started; no live path authorized |
 
@@ -211,6 +212,13 @@ is safe. Liquidation is a distinct future policy with its own limits and authori
 | A14 | Restart from journal with pending/uncertain orders | Preserve IDs/reservations/loss baseline; require reconciliation |
 
 ## Progress record
+
+- 2026-10-04: implemented the static read-only results dashboard and loopback-only
+  page server. Automatic demo renders charts/cost variants/provenance and synthetic
+  control snapshots. Full checks/build/demo passed with 154 tests; browser checks
+  passed, with no external requests. Opened the local viewer for the user.
+  [View implementation/evidence](../superpowers/plans/2026-10-04-offline-results-view.md).
+  The view establishes neither account connectivity nor market advantage.
 
 - 2026-10-04: published the offline baseline to
   `FrankieBiz/feat-complete-quant-research`. Added strict offline price/distribution/

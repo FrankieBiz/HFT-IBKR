@@ -64,7 +64,21 @@ do not delete/recreate the registry to make an interrupted holdout appear untouc
 Frozen selections are also retained in the registry's `frozen_selections` table.
 This is a local audit mechanism, not protection against an operator changing files.
 
-## Local ML environment diagnostic
+## Completed-results dashboard
+
+`make demo` builds `dashboard.html` from its actual synthetic replay reports.
+It supports keyboard cost selection and responsive layouts, keeps provenance
+labels visible, and shows supplied synthetic control state snapshots. It has no
+execution functions. Portable `view render` creates another snapshot; `view serve`
+binds to loopback and serves only the page, never a report directory.
+
+Do not interpret a control row's READY state as account readiness. A03's invalid
+configuration is checked by the demo but intentionally emits no report, so the
+default dashboard lists 13 state snapshots while the harness exercises 14 cases.
+Source statements are declared; even historical data labels do not establish
+independent verification or strategy profitability.
+
+## Local ML environment diagnostic (preflight)
 
 Run `python3 -m quant_local preflight --output PATH` or the archive's
 `local preflight` command on the target workstation. PATH's parent must exist

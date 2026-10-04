@@ -71,6 +71,14 @@ def demo(folder):
              'holdout_repeat':'rejected','holdout_recovery':'byte_identical',
              'control_replay':'byte_identical','durable_restart':'reconciliation_required',
              'broker_connection':'not_implemented','artifacts':str(folder)}
+    controls=[]
+    for number in range(1,15):
+        if number==3:  # Invalid configuration intentionally emits no replay report.
+            continue
+        controls += ['--control',folder/f'A{number:02}.json']
+    run('view','render','--research',folder/'bundled-replay.json',*controls,
+        '--output',folder/'dashboard.html')
+    summary['results_view']='dashboard.html'
     (folder/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
     return summary
 
