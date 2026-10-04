@@ -3,3 +3,4 @@ __pycache__/
 .venv/
 .research-output/
 dist/
+*.qdata

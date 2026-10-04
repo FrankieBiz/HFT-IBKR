@@ -68,14 +68,17 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='Offline ETF trend research using local input files.')
     subparsers = parser.add_subparsers(dest='command', required=True)
     replay = subparsers.add_parser('replay', help='Compare daily trend with buy-and-hold under cost stress.')
-    replay.add_argument('--data', required=True, type=Path)
-    replay.add_argument('--manifest', required=True, type=Path)
+    replay.add_argument('--data', type=Path)
+    replay.add_argument('--manifest', type=Path)
+    replay.add_argument('--bundle', type=Path)
     replay.add_argument('--config', required=True, type=Path)
     replay.add_argument('--evaluation-start', help='YYYY-MM-DD; default first session after lookback warmup')
     replay.add_argument('--output', required=True, type=Path)
     for command in ('evaluate', 'holdout'):
         operation = subparsers.add_parser(command, help='Offline chronological '+command)
-        for field in ('data','manifest','config','protocol','registry','selection','output'):
+        for field in ('data','manifest','bundle'):
+            operation.add_argument('--'+field,type=Path)
+        for field in ('config','protocol','registry','selection','output'):
             operation.add_argument('--'+field,required=True,type=Path)
         operation.add_argument('--run-id',required=True)
     recovery=subparsers.add_parser('recover',help='Export a stored completed result without recomputation.')
@@ -104,9 +107,18 @@ def main(argv=None):
             publish_report(args.output,canonical_json(report))
             print(f'Recovered stored report: {args.output}')
             return 0
+        if args.bundle is not None:
+            if args.data is not None or args.manifest is not None:
+                raise InputError('use --bundle or --data plus --manifest, never both')
+        elif args.data is None or args.manifest is None:
+            raise InputError('supply --bundle or both --data and --manifest')
         raw_config, config_bytes = read_json_document(args.config)
         config = parse_config(raw_config)
-        dataset = load_dataset(args.data, args.manifest)
+        if args.bundle is not None:
+            from quant_data.bundle import read_bundle
+            dataset = read_bundle(args.bundle)
+        else:
+            dataset = load_dataset(args.data, args.manifest)
         if len(dataset.bars) <= config.lookback:
             raise InputError('dataset has no evaluation sessions after warmup')
         if args.command=='replay':

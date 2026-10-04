@@ -18,11 +18,24 @@ def demo(folder):
                               capture_output=True,text=True)
         if result.returncode!=expected:
             raise RuntimeError(f'{args}: exit {result.returncode}: {result.stderr}')
+    intake = ROOT/'examples/intake'
+    bundle = folder/'synthetic.qdata'
+    run('data','prepare','--prices',intake/'prices.csv',
+        '--distributions',intake/'distributions.csv','--calendar',intake/'calendar.csv',
+        '--metadata',intake/'metadata.json','--output',bundle)
+    run('data','inspect','--bundle',bundle,'--output',folder/'intake-report.json')
     shared=['--data',ROOT/'examples/synthetic_spy_daily.csv',
             '--manifest',ROOT/'examples/synthetic_spy_manifest.json',
             '--config',ROOT/'examples/research_config.json']
     run('research','replay',*shared,'--output',folder/'replay.json')
-    evaluation=[*shared,'--protocol',ROOT/'examples/synthetic_protocol.json',
+    bundled=['--bundle',bundle,'--config',ROOT/'examples/research_config.json']
+    run('research','replay',*bundled,'--output',folder/'bundled-replay.json')
+    original=json.loads((folder/'replay.json').read_text())
+    normalized=json.loads((folder/'bundled-replay.json').read_text())
+    for key in ('data_sha256','scenarios'):
+        if original[key]!=normalized[key]:
+            raise RuntimeError(f'bundled research differs from original: {key}')
+    evaluation=[*bundled,'--protocol',ROOT/'examples/synthetic_protocol.json',
                 '--registry',folder/'experiments.sqlite']
     run('research','evaluate',*evaluation,'--run-id','validation',
         '--selection',folder/'selection.json','--output',folder/'validation.json')
@@ -53,6 +66,7 @@ def demo(folder):
     if state['mode']!='RECONCILING' or state['orders'][0]['status']!='UNKNOWN_OUTCOME' or state['cash']!='802':
         raise RuntimeError('durable restart did not preserve uncertain exposure')
     summary={'status':'offline_workflows_passed','data_kind':'synthetic',
+             'data_intake':'prepared_and_inspected','bundled_replay':'financial_results_identical',
              'strategy_validation':'unproven','control_scenarios':14,
              'holdout_repeat':'rejected','holdout_recovery':'byte_identical',
              'control_replay':'byte_identical','durable_restart':'reconciliation_required',

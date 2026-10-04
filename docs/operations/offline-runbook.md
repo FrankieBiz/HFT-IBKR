@@ -85,6 +85,17 @@ warm latency, fallback and crash behavior before H0 can be marked complete.
 
 ## Historical validation dependency
 
+The offline intake implementation prepares a bounded deterministic bundle from
+`--prices`, `--distributions`, `--calendar`, and `--metadata` local paths using
+`python3 -m quant_data prepare --output NEW_BUNDLE` (supply all four input flags).
+`quant_data inspect --bundle PATH --output NEW_REPORT` exports checked coverage
+and provenance. The archive exposes these as `data prepare` and `data inspect`.
+Research commands accept `--bundle PATH`; it cannot be mixed with data/manifest
+paths. Only fixed stored/deflated ZIP members are supported, with no path extraction.
+The [input contract](../superpowers/specs/2026-10-04-data-intake-design.md) requires
+raw prices, explicit pay dates, exact sessions and source/license references.
+These declarations still require provider review; a valid bundle is not that review.
+
 The repository supplies invented data only. A reviewed historical interval needs:
 raw unadjusted daily SPY OHLC/volume, cash distribution ex-dates and pay dates,
 an independently reviewed exact trading calendar, source/retrieval/license evidence,

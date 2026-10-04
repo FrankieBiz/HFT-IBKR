@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "symbol": "SPY",
+  "currency": "USD",
+  "kind": "synthetic",
+  "price_policy": "raw_unadjusted",
+  "corporate_actions": "complete_dividends_no_splits",
+  "splits_in_interval": false,
+  "review_note": "Invented prices and weekday-only calendar; not market observations or an exchange calendar.",
+  "sources": {
+    "prices": {
+      "name": "Invented repository software fixture",
+      "reference": "examples/intake/prices.csv; synthetic, not observed SPY data",
+      "license_reference": "Original repository synthetic fixture; no third-party market data",
+      "retrieved_at": "2026-10-04T00:00:00Z"
+    },
+    "distributions": {
+      "name": "Invented repository software fixture",
+      "reference": "examples/intake/distributions.csv; synthetic, not observed SPY data",
+      "license_reference": "Original repository synthetic fixture; no third-party market data",
+      "retrieved_at": "2026-10-04T00:00:00Z"
+    },
+    "calendar": {
+      "name": "Invented repository software fixture",
+      "reference": "examples/intake/calendar.csv; synthetic, not observed SPY data",
+      "license_reference": "Original repository synthetic fixture; no third-party market data",
+      "retrieved_at": "2026-10-04T00:00:00Z"
+    }
+  }
+}

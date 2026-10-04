@@ -29,7 +29,7 @@ accepts only `simulation`; all other modes fail configuration validation.
 | M0: correct the baseline | Dated broker review, risk contract and scoped implementation tasks | Primary links; review of contradictions and failure cases | Completed planning review |
 | R1: daily ETF research slice | SPY trend signals, next-open replay, independent cash/exposure gates, dividends, cost scenarios and buy-and-hold comparison | Tests, independent review, deterministic synthetic CLI replay | Implemented; validation evidence in R1 plan |
 | M1: offline control engine | Risk decisions, order reservations, reconciliation and deterministic scenario replay | All acceptance scenarios below pass with no network access | Implemented offline; acceptance fixtures/tests pass |
-| M2: reviewed historical data and calibrated replay | Reviewed datasets, calendar/corporate actions, empirical fee/spread/slippage/impact assumptions | Provider/license review, hand-calculated P&L, historical sensitivity report | R1 mechanics implemented; historical/calibration work outstanding |
+| M2: reviewed historical data and calibrated replay | Strict local export intake, reviewed datasets, calendar/corporate actions, empirical fee/spread/slippage/impact assumptions | Provider/license review, hand-calculated P&L, historical sensitivity report | Intake/bundle mechanics implemented; actual historical inputs and calibration outstanding |
 | M3: research evaluation | Chronological causal evaluation, explicit embargo, frozen final holdout and trial registry | Leakage tests; reproducible split indices and experiment manifest; documented selection procedure | Evaluation software implemented; empirical validation outstanding |
 | H0: target-machine preflight | Environment diagnostic followed by isolated single-checkpoint Laya inference on RTX 3070 Ti | Actual CUDA/device/dtype, peak model memory with headroom, bounded-input timings and fallback/crash evidence | Environment diagnostic implemented; target GPU and model benchmark outstanding |
 | A1: optional local text features | Timestamped fixed-taxonomy classification, calibrated abstention and controlled price-only comparison | Frozen labels/rubric/model revision; classification baselines; financial ablation and prospective evidence if training cutoff unknown | Planned; Laya is not integrated and has no order authority |
@@ -211,6 +211,14 @@ is safe. Liquidation is a distinct future policy with its own limits and authori
 | A14 | Restart from journal with pending/uncertain orders | Preserve IDs/reservations/loss baseline; require reconciliation |
 
 ## Progress record
+
+- 2026-10-04: published the offline baseline to
+  `FrankieBiz/feat-complete-quant-research`. Added strict offline price/distribution/
+  calendar intake with declared licenses, consumed hashes, deterministic bounded
+  bundles and direct research integration. `make check build demo` passed with
+  146 tests; bundled replay financial results matched the original fixture.
+  [Intake implementation/evidence](../superpowers/plans/2026-10-04-data-intake.md).
+  No real historical data or provider licenses have been independently reviewed.
 
 - 2026-10-04: inspected repository at `6d0e7b4`; only proposal and agent guidance
   existed. No implementation or test suite was present.

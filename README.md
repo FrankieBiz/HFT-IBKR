@@ -51,6 +51,15 @@ files are preserved; use a fresh filename for each run.
 
 ## Individual research replay
 
+The data-intake pipeline now accepts separate local price, distribution and
+calendar exports with explicit source/license declarations. It produces one
+validated `.qdata` bundle atomically; generated bundles are excluded from Git.
+Research replay/evaluate/holdout accept `--bundle PATH` instead of the existing
+`--data` plus `--manifest` pair. `make demo` now prepares and inspects the synthetic
+bundle and confirms its financial results match the original fixture automatically.
+See the [intake design](docs/superpowers/specs/2026-10-04-data-intake-design.md).
+Source declarations remain unverified; no real historical dataset is included.
+
 For an individual research report:
 
 ```sh

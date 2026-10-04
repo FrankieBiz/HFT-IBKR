@@ -10,16 +10,18 @@ from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 ROOT=Path(__file__).resolve().parents[1]
 ENTRY='''import sys
-if len(sys.argv)<2 or sys.argv[1] not in ('research','control','local'):
-    print('Usage: python3 quant-system.pyz {research|control|local} COMMAND [OPTIONS]',file=sys.stderr)
+if len(sys.argv)<2 or sys.argv[1] not in ('research','control','local','data'):
+    print('Usage: python3 quant-system.pyz {research|control|local|data} COMMAND [OPTIONS]',file=sys.stderr)
     sys.exit(2)
 command=sys.argv.pop(1)
 if command=='research':
     from quant_research.__main__ import main
 elif command=='control':
     from quant_control.__main__ import main
-else:
+elif command=='local':
     from quant_local.__main__ import main
+else:
+    from quant_data.__main__ import main
 sys.exit(main())
 '''
 
@@ -27,7 +29,7 @@ sys.exit(main())
 def build(destination):
     # Only explicit source packages are included; no local data, journals or secrets.
     sources={'__main__.py':ENTRY.encode()}
-    for package in ('quant_research','quant_control','quant_local'):
+    for package in ('quant_research','quant_control','quant_local','quant_data'):
         for path in sorted((ROOT/package).glob('*.py')):
             sources[f'{package}/{path.name}']=path.read_bytes()
     buffer=io.BytesIO()
