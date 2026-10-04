@@ -8,7 +8,7 @@
   "price_policy": "raw_unadjusted",
   "corporate_actions": "complete_dividends_no_splits",
   "splits_in_interval": false,
-  "sha256": "cb9f34d6de298685074ae5dec58d6912d0e7895f584609e0b1ad84f6ab4b1e83",
+  "sha256": "002265f304728d316b985fd07b582ca70c71771da43b8b38f756f1d5a4d78359",
   "calendar_source": "Synthetic weekdays only; deliberately not a NYSE/Arca exchange calendar.",
   "expected_sessions": [
     "2024-01-02",
