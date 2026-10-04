@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "scenario_id": "A03",
+  "provenance": "synthetic",
+  "clock_origin": "relative_milliseconds",
+  "config": {
+    "schema_version": 1,
+    "mode": "simulation",
+    "account": "SIM",
+    "instrument": "SPY",
+    "currency": "USD",
+    "initial_cash": "1000",
+    "initial_equity": "1000",
+    "session_start_equity": "1000",
+    "initial_inventory": 0,
+    "max_units": 20,
+    "max_order_notional": "1000",
+    "max_position_notional": "2000",
+    "daily_loss_limit": "100",
+    "max_quote_age_ms": 100,
+    "max_account_age_ms": 100,
+    "ack_timeout_ms": 50,
+    "reconciliation_timeout_ms": 100
+  },
+  "events": [
+    {
+      "sequence": 1,
+      "time_ms": 0,
+      "kind": "intent",
+      "payload": {
+        "intent_id": "buy-1",
+        "instrument": "SPY",
+        "side": "BUY",
+        "quantity": true,
+        "limit_price": "100",
+        "created_ms": 0,
+        "expires_ms": 1000
+      }
+    }
+  ]
+}

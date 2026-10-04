@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "protocol_id": "synthetic-demonstration-v1",
+  "embargo_sessions": 5,
+  "candidate_lookbacks": [
+    100,
+    150,
+    200
+  ],
+  "selection_metric": "validation_return_under_2x_cost",
+  "development_start": "2024-10-08",
+  "development_end": "2025-01-27",
+  "validation_start": "2025-02-04",
+  "validation_end": "2025-05-26",
+  "holdout_start": "2025-06-03",
+  "holdout_end": "2025-10-06"
+}

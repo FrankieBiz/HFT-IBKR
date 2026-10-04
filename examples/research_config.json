@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "mode": "simulation",
+  "symbol": "SPY",
+  "initial_cash": "10000",
+  "lookback": 200,
+  "target_fraction": "0.80",
+  "max_position_fraction": "0.90",
+  "max_shares": 1000,
+  "max_order_notional": "10000",
+  "max_drawdown": "0.20",
+  "participation_limit": "0.001",
+  "costs": {
+    "half_spread_bps": "0.5",
+    "slippage_bps": "1",
+    "impact_bps": "2",
+    "commission_per_share": "0.005",
+    "minimum_commission": "1",
+    "exchange_fee_bps": "0.1",
+    "sell_fee_bps": "0.1"
+  }
+}
