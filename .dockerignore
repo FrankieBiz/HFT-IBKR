@@ -1,0 +1,8 @@
+*
+!quantlab/
+!quantlab/**
+!examples/
+!examples/**
+!ops/
+!ops/Dockerfile
+**/__pycache__/

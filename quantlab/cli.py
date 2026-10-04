@@ -8,7 +8,7 @@ import sys
 
 from .config import Config
 from .data import DatasetStore
-from .reporting import code_provenance, render_report, write_artifacts, write_new_files
+from .reporting import code_provenance, render_report, render_research_report, write_artifacts, write_new_files
 from .simulation import simulate
 from .synthetic import generate
 
@@ -47,6 +47,20 @@ def parser():
     report = commands.add_parser('report')
     report.add_argument('result', type=Path)
     report.add_argument('--output', type=Path, required=True)
+    research = commands.add_parser('research', help='offline parameter sweep and purged holdout evaluation')
+    research.add_argument('--database', type=Path, required=True)
+    research.add_argument('--dataset', help='optional only when database has exactly one dataset')
+    research.add_argument('--config', type=Path, required=True)
+    research.add_argument('--output', type=Path, required=True)
+    research.add_argument('--registry', type=Path, default=Path('artifacts/research.sqlite'))
+    research.add_argument('--candidates', default='3:12,5:20,10:40', help='comma-separated fast:slow window pairs')
+    trials = commands.add_parser('trials', help='show all attempted local research trials')
+    trials.add_argument('--registry', type=Path, default=Path('artifacts/research.sqlite'))
+    review = commands.add_parser('review', help='append a manual research review note; never activates execution')
+    review.add_argument('trial')
+    review.add_argument('--registry', type=Path, default=Path('artifacts/research.sqlite'))
+    review.add_argument('--state', choices=['pending_review', 'reviewed', 'rejected'], required=True)
+    review.add_argument('--note', required=True)
     return root
 
 
@@ -79,6 +93,42 @@ def main(argv=None):
         elif args.command == 'backtest':
             result = run_backtest(args.database, args.dataset, Config.load(args.config), args.output)
             print(json.dumps(result['summary'], indent=2))
+        elif args.command == 'research':
+            from .research import evaluate
+            for name in ('research.json', 'report.html'):
+                if (args.output/name).exists() or (args.output/name).is_symlink():
+                    raise FileExistsError(f'{args.output/name} exists; choose a new output directory')
+            config = Config.load(args.config)
+            candidates = [tuple(int(x) for x in pair.split(':')) for pair in args.candidates.split(',')]
+            if any(len(pair) != 2 for pair in candidates):
+                raise ValueError('each candidate must be fast:slow')
+            with DatasetStore(args.database) as store:
+                dataset = args.dataset
+                if dataset is None:
+                    available = store.datasets()
+                    if len(available) != 1:
+                        raise ValueError('specify --dataset when database does not contain exactly one dataset')
+                    dataset = available[0]['id']
+                metadata, bars = store.metadata(dataset), store.bars(dataset)
+            if config.interval_seconds != metadata['interval_seconds']:
+                raise ValueError('config interval must match dataset provenance')
+            args.registry.parent.mkdir(parents=True, exist_ok=True)
+            provenance = dict(code_provenance(), dataset_id=dataset, dataset=metadata, strategy='moving-average-v1')
+            result = evaluate(bars, config, candidates, args.registry, provenance)
+            write_new_files(args.output, {'research.json': json.dumps(result, indent=2, sort_keys=True, allow_nan=False)+'\n',
+                                          'report.html': render_research_report(result)})
+            print(json.dumps(dict(output=str(args.output.resolve()), campaign_trial_count=result['campaign_trial_count'],
+                                  psr=result['psr'], dsr=result['dsr'], pbo=result['pbo']), indent=2))
+        elif args.command in ('trials', 'review'):
+            from .research import Registry
+            if not args.registry.is_file():
+                raise ValueError('research registry does not exist')
+            with Registry(args.registry) as registry:
+                if args.command == 'review':
+                    registry.review(args.trial, args.state, args.note)
+                    print(json.dumps(registry.events(args.trial), indent=2))
+                else:
+                    print(json.dumps(registry.runs(), indent=2))
         elif args.command == 'report':
             args.output.parent.mkdir(parents=True, exist_ok=True)
             write_new_files(args.output.parent, {args.output.name: render_report(json.loads(args.result.read_text()))})

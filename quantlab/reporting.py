@@ -87,3 +87,24 @@ def write_new_files(output: Path, contents: dict[str, str]):
             for path in created:
                 path.unlink()
             raise
+
+
+def render_research_report(result: dict) -> str:
+    """Reuse the safe local report shell without treating holdouts as one portfolio."""
+    if result.get('mode') != 'offline_research':
+        raise ValueError('research report requires offline_research mode')
+    json.dumps(result, allow_nan=False)
+    summary = {'campaign_trial_count': result['campaign_trial_count'],
+               'holdout_observations': len(result['holdout_returns'])}
+    for name in ('psr', 'dsr', 'pbo'):
+        diagnostic = result[name]
+        label = {'psr': 'Holdout PSR', 'dsr': 'Full-history selected-candidate DSR', 'pbo': 'Full-history candidate CSCV PBO'}[name]
+        summary[label] = (diagnostic.get('value') if diagnostic['status'] == 'defined'
+                          else 'Undefined: '+diagnostic.get('reason', 'insufficient evidence'))
+        if name == 'dsr' and diagnostic['status'] == 'defined':
+            summary['DSR scope'] = {key: diagnostic[key] for key in ('scope', 'selected_candidate_index', 'observations', 'horizon_start', 'horizon_end') if key in diagnostic}
+    proxy = dict(mode='simulation', summary=summary, equity=[], fills=[],
+                 assumptions=result['limitations'], provenance=result['provenance'])
+    rendered = render_report(proxy).replace('Research run</h1>', 'Offline research evaluation</h1>')
+    trials = html.escape(json.dumps(result['trials'], indent=2, allow_nan=False))
+    return rendered.replace('</html>', '<h2>Attempted candidates</h2><pre>'+trials+'</pre></html>')

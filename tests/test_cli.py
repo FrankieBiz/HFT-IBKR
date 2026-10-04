@@ -77,3 +77,30 @@ class CliTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 write_artifacts(report, output)
             self.assertEqual(target.read_text(), 'keep')
+
+    def test_research_command_and_persistent_registry(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            demo = root/'demo'
+            subprocess.run([sys.executable, '-m', 'quantlab', 'demo', '--output', str(demo)],
+                           check=True, capture_output=True)
+            command = [sys.executable, '-m', 'quantlab', 'research', '--database', str(demo/'history.sqlite'),
+                       '--config', 'examples/simulation.toml', '--output', str(root/'research'),
+                       '--registry', str(root/'research.sqlite')]
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            research = json.loads((root/'research'/'research.json').read_text())
+            self.assertEqual(research['mode'], 'offline_research')
+            self.assertEqual(research['campaign_trial_count'], 3)
+            rendered = (root/'research'/'report.html').read_text()
+            self.assertIn('Holdout PSR', rendered)
+            self.assertIn('Full-history selected-candidate DSR', rendered)
+            if research['dsr']['status'] == 'defined':
+                self.assertIn('selected_candidate_index', rendered)
+            listed = subprocess.run([sys.executable, '-m', 'quantlab', 'trials', '--registry', str(root/'research.sqlite')],
+                                    capture_output=True, text=True, check=True)
+            self.assertEqual(len(json.loads(listed.stdout)), 3)
+            self.assertNotEqual(subprocess.run(command, capture_output=True).returncode, 0)
+            listed = subprocess.run([sys.executable, '-m', 'quantlab', 'trials', '--registry', str(root/'research.sqlite')],
+                                    capture_output=True, text=True, check=True)
+            self.assertEqual(len(json.loads(listed.stdout)), 3)

@@ -1,0 +1,21 @@
+name: Offline checks
+# Manual only: pushing this branch does not consume hosted CI minutes.
+# Enable automatic triggers after runner/billing policy is approved.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Build and test without installing dependencies
+        run: make check CXX=g++
+      - name: Exercise complete local workflow
+        run: |
+          python3 -m quantlab demo --output artifacts/ci
+          python3 -m quantlab research --database artifacts/ci/history.sqlite --config examples/simulation.toml --output artifacts/ci/research --registry artifacts/ci/research.sqlite
