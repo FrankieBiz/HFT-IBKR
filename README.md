@@ -22,7 +22,9 @@ See the [blueprint review](docs/research/2026-10-05-architecture-blueprint-revie
 The pre-registered [`spy-daily-v1` study](studies/spy-daily-v1/PREREGISTRATION.md) runs
 the daily trend rule against buy-and-hold on raw SPY history from 2016. It uses free
 Alpaca data fetched by `python3 -m quant_data fetch-alpaca`, which needs a free Alpaca
-signup with no card; the data must not be redistributed.
+signup with no card; the data must not be redistributed. To set it up on Windows
+with WSL and test each trading day, follow the
+[Windows + WSL runbook](docs/operations/windows-wsl-runbook.md).
 
 ## Integrated daily shadow session
 

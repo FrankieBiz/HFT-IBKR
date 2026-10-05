@@ -13,9 +13,15 @@ sizing and a durable SQLite decision ledger. It produces a non-binding proposal 
 an explanation of HOLD/BLOCKED. No SDK, socket, account request or order method is
 used. It does not change the separate SIM control/recovery engine.
 
-All snapshots are restricted to SIM/SPY/USD and synthetic quotes. A historical
-bundle does not change that restriction or establish strategy validation. This
-rehearsal is not a real-time broker adapter, live monitor or paper-order submission.
+All snapshots are restricted to SIM/SPY/USD. Quotes are either synthetic or a
+declared `alpaca_iex_realtime` quote. `quant_session live-inputs` renders that quote
+and the schedule from the free Alpaca calendar and SPY's real-time IEX quote, for a
+portfolio the user declares. IEX is one venue, not the national best quote. The
+command refuses to run outside today's session, so a closed market never freezes a
+BLOCKED decision. `scripts/daily_shadow.sh` chains fetch, prepare, live inputs and
+plan; see the [Windows + WSL runbook](windows-wsl-runbook.md#6-each-trading-day-record-the-shadow-decision).
+None of this establishes strategy validation. It is not a broker adapter, live
+monitor or paper-order submission.
 
 ## Automatic end-to-end demonstration
 

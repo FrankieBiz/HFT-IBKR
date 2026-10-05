@@ -102,4 +102,9 @@ python3 -m quant_research evaluate --bundle "$D/spy.qdata" --config $S/config.js
   --registry "$D/experiments.sqlite" --selection "$D/selection.json" --output "$D/validation.json" --run-id validation-1
 python3 -m quant_research holdout --bundle "$D/spy.qdata" --config $S/config.json --protocol $S/protocol.json \
   --registry "$D/experiments.sqlite" --selection "$D/selection.json" --output "$D/holdout.json" --run-id holdout-1
+# 4. Apply the decision rule above mechanically:
+python3 scripts/study_verdict.py "$D/holdout.json"
 ```
+
+Step-by-step setup for a Windows PC with WSL is in the
+[Windows + WSL runbook](../../docs/operations/windows-wsl-runbook.md).
