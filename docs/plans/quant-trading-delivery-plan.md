@@ -46,6 +46,12 @@ the decision and limitations. Capital allocation and production limits remain
 unselected. Reviewed historical strategy evaluation and a separate broker-adapter design
 remain necessary before account-level paper tests.
 
+An optional standalone [paper Gateway connection diagnostic](../operations/paper-gateway-setup.md)
+now waits for the official SDK readiness callback and disconnects without requesting
+account data or submitting/cancelling orders. Its fake-client, timeout and SDK
+protobuf compatibility checks are complete; the real Windows/WSL connection remains
+unverified. This is setup tooling, not implementation of the M4 paper adapter.
+
 ## Revised local architecture and priorities
 
 Choose daily/swing ETF research for the present desktop and broker scope. Keep

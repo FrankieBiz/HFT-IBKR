@@ -42,6 +42,13 @@ The archive provides `view render --research REPORT --control CONTROL_REPORT
 dashboard is a snapshot, not a live account interface. Rejected configurations
 emit no final-state report; the demo still validates all 14 acceptance scenarios.
 
+## Paper Gateway connection diagnostic
+
+For a separately prepared paper Gateway, an optional official-SDK, non-ordering
+API connection diagnostic is available. See the
+[Windows/Ubuntu paper Gateway setup](docs/operations/paper-gateway-setup.md).
+It is not a broker adapter and is never invoked by the offline demo.
+
 ## Local AI environment checks
 
 The diagnostic runs without installing Laya or downloading weights:
