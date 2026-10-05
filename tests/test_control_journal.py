@@ -89,6 +89,29 @@ class ControlJournalTests(unittest.TestCase):
                 self.assertEqual(runtime.state.mode,'RECONCILING')
                 self.assertFalse(any(o['type']=='submit_simulated' for o in runtime.startup_outputs))
 
+    def test_event_history_is_an_immutable_snapshot(self):
+        events,h=ready_events()
+        with TemporaryDirectory() as tmp, Journal(Path(tmp)/'events.jsonl',h.config) as journal:
+            journal.append(events[0])
+            earlier=journal.events
+            journal.append(events[1])
+            self.assertEqual(earlier,(events[0],))
+            self.assertEqual(journal.events,tuple(events[:2]))
+
+    def test_durable_sync_requests_full_flush_and_falls_back_to_fsync(self):
+        from quant_research import serde
+        with patch.object(serde.fcntl,'F_FULLFSYNC',51,create=True), \
+                patch.object(serde.fcntl,'fcntl') as full, patch.object(serde.os,'fsync') as fsync:
+            serde.durable_sync(7)
+            full.assert_called_once_with(7,51)
+            fsync.assert_not_called()
+            full.side_effect=OSError('unsupported by filesystem')
+            serde.durable_sync(7)
+            fsync.assert_called_once_with(7)
+        with patch.object(serde,'fcntl',None), patch.object(serde.os,'fsync',side_effect=OSError('disk')):
+            with self.assertRaises(OSError):
+                serde.durable_sync(7)
+
     def test_fsync_failure_poisons_runtime_and_state_never_admits(self):
         events,h=ready_events()
         with TemporaryDirectory() as tmp:
@@ -97,7 +120,7 @@ class ControlJournalTests(unittest.TestCase):
                 for event in events[:-2]:
                     runtime.process(event)
                 before=runtime.state
-                with patch('quant_control.journal.os.fsync',side_effect=OSError('disk failure')):
+                with patch('quant_control.journal.durable_sync',side_effect=OSError('disk failure')):
                     with self.assertRaises(InputError):
                         runtime.process(events[-2])
                 self.assertEqual(runtime.state,before)

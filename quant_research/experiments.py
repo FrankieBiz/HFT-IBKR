@@ -20,6 +20,8 @@ class ExperimentRegistry:
             self.connection.row_factory = sqlite3.Row
             self.connection.execute('PRAGMA foreign_keys=ON')
             self.connection.execute('PRAGMA synchronous=FULL')
+            # Without fullfsync, SQLite's fsync on macOS may stop at the drive cache.
+            self.connection.execute('PRAGMA fullfsync=ON')
             self.connection.executescript('''
                 CREATE TABLE IF NOT EXISTS events (
                     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,6 +58,18 @@ class ExperimentRegistry:
                     artifact_digest TEXT NOT NULL UNIQUE,
                     run_id TEXT NOT NULL UNIQUE
                 );
+                CREATE TABLE IF NOT EXISTS released_holdout_sessions (
+                    scope TEXT NOT NULL,
+                    session TEXT NOT NULL,
+                    run_id TEXT NOT NULL,
+                    PRIMARY KEY (scope, session)
+                );
+                CREATE TRIGGER IF NOT EXISTS released_sessions_no_update
+                    BEFORE UPDATE ON released_holdout_sessions
+                    BEGIN SELECT RAISE(ABORT,'released holdout sessions are append-only'); END;
+                CREATE TRIGGER IF NOT EXISTS released_sessions_no_delete
+                    BEFORE DELETE ON released_holdout_sessions
+                    BEGIN SELECT RAISE(ABORT,'released holdout sessions are append-only'); END;
                 CREATE TRIGGER IF NOT EXISTS payloads_no_update BEFORE UPDATE ON result_payloads
                     BEGIN SELECT RAISE(ABORT,'result payloads are append-only'); END;
                 CREATE TRIGGER IF NOT EXISTS payloads_no_delete BEFORE DELETE ON result_payloads
@@ -87,7 +101,7 @@ class ExperimentRegistry:
                 raise InputError(f'experiment registry rejected operation: {error}') from error
             raise
 
-    def _reserve(self, run_id, kind, artifact_digest, identities):
+    def _reserve(self, run_id, kind, artifact_digest, identities, scope=None, sessions=()):
         if not isinstance(run_id, str) or not run_id.strip():
             raise InputError('run_id: nonempty string required')
         if not isinstance(identities, dict):
@@ -105,6 +119,18 @@ class ExperimentRegistry:
                 self.connection.execute(
                     'INSERT INTO holdout_claims(stable_identity,artifact_digest,run_id) VALUES(?,?,?)',
                     (frozen['stable_identity'], artifact_digest, run_id))
+                # The identity claim above changes with any protocol, config or code edit;
+                # this claim is on the revealed market sessions themselves.
+                placeholders = ','.join('?' * len(sessions))
+                seen = self.connection.execute(
+                    f'SELECT session FROM released_holdout_sessions WHERE scope=? AND session IN ({placeholders}) '
+                    'ORDER BY session LIMIT 1', (scope, *sessions)).fetchone()
+                if seen is not None:
+                    raise InputError(f'holdout session {seen["session"]} was already released for {scope}; '
+                                     'a changed experiment requires fresh final data')
+                self.connection.executemany(
+                    'INSERT INTO released_holdout_sessions(scope,session,run_id) VALUES(?,?,?)',
+                    [(scope, session, run_id) for session in sessions])
             self.connection.execute(
                 'INSERT INTO events(run_id,kind,status,artifact_digest,identities) VALUES(?,?,?,?,?)',
                 (run_id, kind, 'reserved', artifact_digest, canonical_json(identities)))
@@ -112,11 +138,23 @@ class ExperimentRegistry:
     def reserve_validation(self, run_id, identities):
         self._reserve(run_id, 'validation', None, identities)
 
-    def reserve_holdout(self, run_id, artifact_digest, identities):
+    def reserve_holdout(self, run_id, artifact_digest, identities, *, scope, sessions):
+        """Consume one frozen selection and every market session it reveals.
+
+        `scope` names the data population (for example ``historical:SPY``); a session
+        released once in a scope can never be released again, whatever the protocol,
+        configuration or code identity.
+        """
         if not isinstance(artifact_digest, str) or len(artifact_digest) != 64 or any(
                 c not in '0123456789abcdef' for c in artifact_digest):
             raise InputError('artifact digest: SHA-256 required')
-        self._reserve(run_id, 'holdout', artifact_digest, identities)
+        if not isinstance(scope, str) or not scope.strip():
+            raise InputError('holdout scope: nonempty string required')
+        if (not isinstance(sessions, (list, tuple)) or not sessions
+                or any(not isinstance(item, str) or not item for item in sessions)
+                or any(a >= b for a, b in zip(sessions, sessions[1:]))):
+            raise InputError('holdout sessions: nonempty strictly increasing list required')
+        self._reserve(run_id, 'holdout', artifact_digest, identities, scope, tuple(sessions))
 
     def _finish(self, run_id, status, result_digest=None, error=None, result=None):
         with self._transaction():

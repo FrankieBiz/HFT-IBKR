@@ -23,6 +23,7 @@ class DecisionLedger:
         try:
             with closing(sqlite3.connect(self.path, timeout=10)) as connection, connection:
                 connection.execute('PRAGMA synchronous=FULL')
+                connection.execute('PRAGMA fullfsync=ON')
                 connection.execute('BEGIN IMMEDIATE')
                 connection.execute('CREATE TABLE IF NOT EXISTS decisions ('
                     'account TEXT NOT NULL CHECK(account="SIM"), '

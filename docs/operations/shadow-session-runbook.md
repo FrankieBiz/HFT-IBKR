@@ -85,8 +85,10 @@ they never replace the stored decision. Independent rehearsal cases need indepen
 ledgers. Do not delete/reset a ledger to bypass a conflict in an operational workflow.
 
 This is a local audit/idempotency guard, not order reservation, fill accounting,
-tamper-resistant storage or an adaptive intraday journal. Halt/drawdown blocks
-proposals; it does not liquidate inventory or guarantee a maximum loss. Full exits
+tamper-resistant storage or an adaptive intraday journal. A declared halt blocks all
+proposals. A drawdown breach blocks entries but still proposes signal-driven exits,
+matching the backtest's buy-only halt. Neither liquidates inventory or guarantees a
+maximum loss. Full exits
 can be blocked by capacity/notional limits; partial exit policy is not implemented.
 
 ## What remains before actual paper trading

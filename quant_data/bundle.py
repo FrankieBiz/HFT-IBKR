@@ -12,7 +12,8 @@ from zipfile import BadZipFile, ZipFile, ZipInfo, ZIP_DEFLATED, ZIP_STORED
 import zlib
 
 from quant_research.data import COLUMNS, load_dataset
-from quant_research.serde import InputError, canonical_json, decimal_value, iso_date, read_json_document, strict_keys
+from quant_research.serde import (InputError, canonical_json, decimal_value, durable_sync, iso_date,
+                                  read_json_document, strict_keys)
 
 MAX_MEMBER = 32 * 1024 * 1024
 MEMBERS = ('dataset.csv', 'manifest.json', 'intake.json')
@@ -127,7 +128,7 @@ def _publish(destination, content):
             temporary = Path(handle.name)
             handle.write(content)
             handle.flush()
-            os.fsync(handle.fileno())
+            durable_sync(handle.fileno())
         os.link(temporary, destination)
     except OSError as error:
         raise InputError(f'cannot publish bundle: {error}') from error

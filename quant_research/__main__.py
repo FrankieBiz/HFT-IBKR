@@ -15,7 +15,7 @@ from .config import parse_config
 from .data import load_dataset
 from .evaluation import parse_protocol, evaluate_registered, freeze_selection, release_holdout
 from .experiments import ExperimentRegistry
-from .serde import InputError, canonical_json, iso_date, read_json_document
+from .serde import InputError, canonical_json, durable_sync, iso_date, read_json_document
 
 ASSUMPTIONS = [
     'Exploratory offline simulation; no strategy profitability or readiness is established.',
@@ -54,7 +54,7 @@ def publish_report(destination, content):
             temporary = Path(handle.name)
             handle.write(content)
             handle.flush()
-            os.fsync(handle.fileno())
+            durable_sync(handle.fileno())
         # A hard link atomically creates the target and fails if any target exists.
         os.link(temporary, destination)
     except OSError as error:

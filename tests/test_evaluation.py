@@ -214,3 +214,41 @@ class EvaluationTests(unittest.TestCase):
                 else:
                     with self.assertRaises(InputError):
                         release_holdout(artifact, dataset, config, protocol, 'code-v1', registry=registry, run_id='second')
+
+
+    def test_renamed_protocol_or_changed_code_cannot_reopen_released_sessions(self):
+        dataset, config, raw = inputs()
+        with TemporaryDirectory() as tmp, ExperimentRegistry(Path(tmp)/'runs.sqlite') as registry:
+            def attempt(index, protocol_raw, code):
+                protocol = parse_protocol(protocol_raw, dataset)
+                report = evaluate_registered(dataset, config, protocol, code, registry=registry,
+                                             run_id=f'validation-{index}')
+                artifact = freeze_selection(dataset, config, protocol, code, report)
+                registry.register_freeze(f'validation-{index}', artifact)
+                return release_holdout(artifact, dataset, config, protocol, code, registry=registry,
+                                       run_id=f'holdout-{index}')
+            attempt(0, raw, 'code-v1')
+            shifted = dict(raw, protocol_id='shifted', holdout_start=dataset.bars[14].session.isoformat(),
+                           holdout_end=dataset.bars[17].session.isoformat())
+            for index, (protocol_raw, code) in enumerate([(dict(raw, protocol_id='renamed'), 'code-v1'),
+                                                         (raw, 'code-v2'), (shifted, 'code-v1')], 1):
+                with self.subTest(index=index), self.assertRaisesRegex(InputError, 'already released'):
+                    attempt(index, protocol_raw, code)
+            claimed = registry.connection.execute(
+                'SELECT scope, session, run_id FROM released_holdout_sessions ORDER BY session').fetchall()
+            self.assertEqual([tuple(row) for row in claimed],
+                             [('synthetic:SPY', bar.session.isoformat(), 'holdout-0') for bar in dataset.bars[13:17]])
+
+    def test_released_sessions_are_scoped_by_data_kind(self):
+        synthetic, config, raw = inputs()
+        historical = replace(synthetic, manifest={'kind': 'historical'})
+        with TemporaryDirectory() as tmp, ExperimentRegistry(Path(tmp)/'runs.sqlite') as registry:
+            for dataset in (synthetic, historical):
+                protocol = parse_protocol(raw, dataset)
+                kind = dataset.manifest['kind']
+                report = evaluate_registered(dataset, config, protocol, 'code-v1', registry=registry, run_id=kind)
+                artifact = freeze_selection(dataset, config, protocol, 'code-v1', report)
+                registry.register_freeze(kind, artifact)
+                result = release_holdout(artifact, dataset, config, protocol, 'code-v1', registry=registry,
+                                         run_id=kind + '-holdout')
+                self.assertEqual(result['data_kind'], kind)

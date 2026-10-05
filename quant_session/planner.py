@@ -13,7 +13,8 @@ LIMITATIONS = [
     'Snapshot, quote, reconciliation and schedule are synthetic declarations, not independently verified.',
     'Historical source declarations remain unreviewed; schedule is not exchange-certified.',
     'Effective NAV excludes unpaid dividends and other assets; no broker balance-sheet equivalence.',
-    'Halts and drawdown block proposals without forced liquidation or partial exits.',
+    'A declared halt blocks every proposal; a drawdown breach blocks entries only, as in the backtest.',
+    'Neither forces liquidation or partial exits.',
     'One frozen decision per session is not order reservation or an adaptive execution journal.',
 ]
 
@@ -79,13 +80,16 @@ def plan_session(dataset, config, schedule, snapshot, source_hashes=None):
     for condition,reason in [(not portfolio['reconciled'],'UNRECONCILED'),
             (portfolio['pending_orders']>0,'PENDING_ORDERS'),
             (portfolio['uncertain_orders']>0,'UNCERTAIN_ORDERS'),(portfolio['halted'],'HALTED'),
-            (effective_nav == 0,'ZERO_EFFECTIVE_NAV'),(drawdown >= config.max_drawdown,'DRAWDOWN_LIMIT')]:
+            (effective_nav == 0,'ZERO_EFFECTIVE_NAV')]:
         if condition:
             blockers.append(reason)
     if not blockers:
         side = ('BUY' if report['signal']=='LONG' and portfolio['shares']==0 else
                 'SELL' if report['signal']=='CASH' and portfolio['shares']>0 else None)
-        if side is None:
+        # Like the backtest's drawdown halt, a breach stops new exposure but never an exit.
+        if side == 'BUY' and drawdown >= config.max_drawdown:
+            blockers.append('DRAWDOWN_LIMIT')
+        elif side is None:
             report['status'] = 'HOLD'
         else:
             reference = quote['ask' if side=='BUY' else 'bid']

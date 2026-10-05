@@ -227,7 +227,10 @@ def evaluate_registered(dataset, config, protocol, code_identity, *, registry, r
 @fixed_decimal
 def release_holdout(artifact, dataset, config, protocol, code_identity, *, registry, run_id):
     protocol = verify_selection(artifact, dataset, config, protocol, code_identity)
-    registry.reserve_holdout(run_id, artifact['integrity_digest'], artifact['identities'])
+    revealed = [bar.session.isoformat() for bar in dataset.bars
+                if protocol.holdout_start <= bar.session <= protocol.holdout_end]
+    registry.reserve_holdout(run_id, artifact['integrity_digest'], artifact['identities'],
+                             scope=f"{dataset.manifest['kind']}:{config.symbol}", sessions=revealed)
     try:
         report = {'schema_version': 1, 'mode': 'offline_holdout_release',
                   'strategy_validation': 'unproven', 'data_kind': dataset.manifest['kind'],

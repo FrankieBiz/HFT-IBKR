@@ -89,6 +89,18 @@ class ShadowTests(unittest.TestCase):
             snapshot=copy.deepcopy(base); snapshot['quote']['as_of']=value
             self.assertIn(reason,decide(data,config,schedule,snapshot)['blockers'])
 
+    def test_drawdown_breach_blocks_entries_but_not_signal_exits(self):
+        for closes, shares, status, side, blockers in [((102,100),5,'PROPOSED','SELL',[]),
+                ((100,102),5,'HOLD',None,[]), ((100,102),0,'BLOCKED',None,['DRAWDOWN_LIMIT'])]:
+            data,config,schedule,snapshot=fixtures(closes,shares)
+            snapshot['portfolio']['peak_nav']='20000'
+            report=decide(data,config,schedule,snapshot)
+            self.assertGreaterEqual(report['drawdown'],config.max_drawdown)
+            self.assertEqual((report['status'],report['blockers']),(status,blockers))
+            self.assertEqual(report['proposal']['side'] if report['proposal'] else None,side)
+            if side=='SELL':
+                self.assertEqual(report['proposal']['quantity'],5)
+
     def test_account_age_close_coherence_and_history_boundaries(self):
         data,config,schedule,snapshot=fixtures()
         snapshot['portfolio']['as_of']='2025-03-11T13:28:59Z'

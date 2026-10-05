@@ -1,15 +1,37 @@
 """Strict boundaries and deterministic, bounded decimal arithmetic."""
 
 import json
+import os
 from datetime import date
 from decimal import (Context, Decimal, DivisionByZero, InvalidOperation, Overflow,
                      localcontext, ROUND_HALF_EVEN)
 from functools import wraps
 from pathlib import Path
 
+try:
+    import fcntl
+except ImportError:  # Non-POSIX hosts; the control journal already requires POSIX.
+    fcntl = None
+
 
 class InputError(ValueError):
     """A supplied dataset, configuration or output destination is invalid."""
+
+
+def durable_sync(descriptor):
+    """Flush a file descriptor to stable storage, not just to the drive cache.
+
+    On macOS plain fsync(2) may leave data in the drive's volatile cache; F_FULLFSYNC
+    requests a full flush. Filesystems that reject it fall back to fsync.
+    """
+    full = getattr(fcntl, 'F_FULLFSYNC', None) if fcntl is not None else None
+    if full is not None:
+        try:
+            fcntl.fcntl(descriptor, full)
+            return
+        except OSError:
+            pass
+    os.fsync(descriptor)
 
 
 def strict_keys(raw, keys, name):

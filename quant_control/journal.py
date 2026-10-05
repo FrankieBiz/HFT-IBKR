@@ -11,7 +11,7 @@ import os
 from dataclasses import asdict
 from pathlib import Path
 
-from quant_research.serde import InputError, canonical_json, strict_keys
+from quant_research.serde import InputError, canonical_json, durable_sync, strict_keys
 from .domain import parse_event, validate_config
 
 SCHEMA = 1
@@ -127,15 +127,16 @@ class Journal:
             content = self._file.read()
             self.existing = not created
             if self.existing:
-                self.events, self._previous = _read_records(content, self.config)
+                events, self._previous = _read_records(content, self.config)
+                self._events = list(events)
             else:
-                self.events = ()
+                self._events = []
                 self._previous = ZERO_DIGEST
                 self._write_record(0, 'header', _normalized(asdict(self.config)))
                 # Persist a newly created directory entry as well as its header.
                 directory = os.open(self.path.parent, os.O_RDONLY)
                 try:
-                    os.fsync(directory)
+                    durable_sync(directory)
                 finally:
                     os.close(directory)
             self._file.seek(0, os.SEEK_END)
@@ -157,7 +158,7 @@ class Journal:
             if written != len(line):
                 raise OSError('short control journal write')
             self._file.flush()
-            os.fsync(self._file.fileno())
+            durable_sync(self._file.fileno())
         except (OSError, ValueError) as error:
             self.poisoned = True
             raise InputError(f'control journal storage failure: {error}') from error
@@ -167,12 +168,17 @@ class Journal:
         if self.poisoned or self._file is None:
             raise InputError('control journal writer is poisoned or closed')
         event = parse_event(event.raw)
-        expected = len(self.events) + 1
-        previous_time = self.events[-1].time_ms if self.events else 0
+        expected = len(self._events) + 1
+        previous_time = self._events[-1].time_ms if self._events else 0
         if event.sequence != expected or event.time_ms < previous_time:
             raise InputError('journal append sequence or clock regression')
         self._write_record(expected, 'input', event.raw)
-        self.events = (*self.events, event)
+        # Appending to a list keeps each write O(1); rebuilding a tuple copied all history.
+        self._events.append(event)
+
+    @property
+    def events(self):
+        return tuple(self._events)
 
     def close(self):
         if self._file is not None:

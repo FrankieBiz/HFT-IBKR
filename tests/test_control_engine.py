@@ -244,6 +244,18 @@ class ControlEngineTests(unittest.TestCase):
         self.assertNotEqual(h.state.mode,'READY')
         self.assertEqual(h.state.cash,D('802'))
 
+    def test_account_updates_during_collection_cannot_extend_reconciliation_deadline(self):
+        h=Harness(); h.send('begin_reconciliation')
+        for time in (60,120):
+            h.send('account',{'cash':'1000','equity':'1000','received_ms':time,'broker_sequence':0},time=time)
+            h.send('timer',time=time)
+        # Each update starts a new generation, but the attempt's 100 ms deadline still applies.
+        self.assertGreater(h.state.generation,1)
+        self.assertEqual(h.state.mode,'HALTED')
+        self.assertEqual(h.state.halt_reasons,('RECONCILIATION_TIMEOUT',))
+        h.send('begin_reconciliation',time=130); h.send('timer',time=229)
+        self.assertEqual(h.state.mode,'RECONCILING')
+
     def test_A14_restart_preserves_cash_reservations_ids_and_loss_baseline(self):
         h=Harness().ready(); h.send('intent',intent_raw()); h.fill()
         h.send('restart')

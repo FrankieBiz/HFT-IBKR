@@ -18,6 +18,9 @@ def registered_artifact(registry):
     return artifact
 
 
+SESSIONS = {'scope': 'synthetic:SPY', 'sessions': ['2024-01-02', '2024-01-03']}
+
+
 class RegistryTests(unittest.TestCase):
     def test_completed_results_can_be_recovered_without_recomputing(self):
         from quant_research.evaluation import digest
@@ -38,17 +41,28 @@ class RegistryTests(unittest.TestCase):
                 with self.assertRaises(InputError):
                     registry.reserve_validation('first', {})
                 artifact = registered_artifact(registry)
-                registry.reserve_holdout('release', artifact['integrity_digest'], artifact['identities'])
+                registry.reserve_holdout('release', artifact['integrity_digest'], artifact['identities'], **SESSIONS)
             with ExperimentRegistry(path) as registry:
                 self.assertEqual([r['status'] for r in registry.records()], ['reserved','completed','reserved','completed','reserved'])
                 with self.assertRaises(InputError):
-                    registry.reserve_holdout('new', artifact['integrity_digest'], artifact['identities'])
+                    registry.reserve_holdout('new', artifact['integrity_digest'], artifact['identities'], **SESSIONS)
                 with self.assertRaises(InputError):
                     registry.fail('first', 'later')
                 with self.assertRaises(sqlite3.DatabaseError):
                     registry.connection.execute("DELETE FROM events")
                 with self.assertRaises(sqlite3.DatabaseError):
                     registry.connection.execute("UPDATE events SET status='failed'")
+
+    def test_holdout_requires_declared_increasing_sessions(self):
+        with TemporaryDirectory() as tmp, ExperimentRegistry(Path(tmp)/'registry.sqlite') as registry:
+            artifact = registered_artifact(registry)
+            for scope, sessions in [('', ['2024-01-02']), ('synthetic:SPY', []),
+                                    ('synthetic:SPY', ['2024-01-03', '2024-01-02']),
+                                    ('synthetic:SPY', ['2024-01-02', '2024-01-02'])]:
+                with self.subTest(scope=scope, sessions=sessions), self.assertRaises(InputError):
+                    registry.reserve_holdout('release', artifact['integrity_digest'], artifact['identities'],
+                                             scope=scope, sessions=sessions)
+            self.assertEqual([r['kind'] for r in registry.records()], ['validation', 'validation'])
 
     def test_concurrent_release_has_exactly_one_winner(self):
         with TemporaryDirectory() as tmp:
@@ -58,7 +72,7 @@ class RegistryTests(unittest.TestCase):
             def reserve(i):
                 try:
                     with ExperimentRegistry(path) as registry:
-                        registry.reserve_holdout(str(i), artifact['integrity_digest'], artifact['identities'])
+                        registry.reserve_holdout(str(i), artifact['integrity_digest'], artifact['identities'], **SESSIONS)
                     return True
                 except InputError:
                     return False

@@ -61,9 +61,12 @@ def halt(state, reason):
                    certified_generation=None,certified_ms=None)
 
 
-def begin(state, now):
+def begin(state, now, *, invalidated=False):
+    # An intervening fill/account/order event invalidates the generation but not the
+    # attempt's deadline; otherwise a steady update stream reconciles forever unseen.
+    started=state.reconcile_started_ms if invalidated and state.reconcile_started_ms is not None else now
     return replace(state,mode='RECONCILING',halted=True,generation=state.generation+1,
-                   reconcile_started_ms=now,snapshot_parts=(),certified_generation=None,certified_ms=None)
+                   reconcile_started_ms=started,snapshot_parts=(),certified_generation=None,certified_ms=None)
 
 
 def replace_order(state, order):
@@ -188,12 +191,12 @@ def apply_event(state,event,config):
             if config.session_start_equity-state.account.equity>=config.daily_loss_limit:
                 state=halt(state,'LOSS_LIMIT')
             if original.mode=='RECONCILING' and state.mode!='HALTED':
-                state=begin(state,now)
+                state=begin(state,now,invalidated=True)
     elif kind=='fill':
         execution=Execution.from_raw(data)
         state=apply_execution(state,execution)
         if original.mode=='RECONCILING' and state.mode!='HALTED' and state.executions!=original.executions:
-            state=begin(state,now)
+            state=begin(state,now,invalidated=True)
     elif kind in ('ack','cancel','cancelled','rejected'):
         order=next((item for item in state.orders if item.intent.intent_id==data['intent_id']),None)
         if order is None:
@@ -226,7 +229,7 @@ def apply_event(state,event,config):
                     state=replace_order(state,replace(order,status='UNKNOWN_OUTCOME',pending_terminal_quantity=filled))
                     state=halt(state,'UNKNOWN_OUTCOME')
             if original.mode=='RECONCILING' and state.mode!='HALTED':
-                state=begin(state,now)
+                state=begin(state,now,invalidated=True)
     elif kind in ('begin_reconciliation','restored','restart'):
         if kind=='restart':
             state=replace(state,orders=tuple(replace(order,status='UNKNOWN_OUTCOME') if order.remaining else order for order in state.orders))

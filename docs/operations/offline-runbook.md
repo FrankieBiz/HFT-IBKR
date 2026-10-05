@@ -26,7 +26,9 @@ means invalid input/storage/destination; exit 1 means an unexpected runtime fail
 
 The control journal stores a complete explicit synthetic configuration and all input
 events, including rejected and duplicate intents. Inputs are flushed/fsynced before
-the reducer changes state or returns simulated outputs. A failed write may already
+the reducer changes state or returns simulated outputs. On macOS the sync uses
+`F_FULLFSYNC` (SQLite stores use `PRAGMA fullfsync`), because plain fsync there can
+leave data in the drive cache; it falls back to fsync where unsupported. A failed write may already
 have reached storage: never continue that runtime instance or assume its input was
 not recorded. Close it, preserve the log, resolve the storage condition and validate
 the entire journal before continuing. A truncated or corrupted record is an error;
@@ -37,7 +39,10 @@ without restarting. Its outputs are historical simulated decisions, never traffi
 to resend. `OfflineRuntime(path, config)` takes an exclusive lock and automatically
 journals restart when reopening an existing log. It enters RECONCILING and retains
 all unresolved orders. New intents require complete current-generation snapshot
-evidence and explicit reset. A continuation fixture's first sequence is the prior
+evidence and explicit reset. A fill, account or order event during collection starts
+a new generation but keeps the attempt's original reconciliation deadline, so a
+continuously updating account ends in `RECONCILIATION_TIMEOUT` rather than
+reconciling indefinitely. A consistent cut across real broker streams remains M4 work. A continuation fixture's first sequence is the prior
 last sequence plus two (one for restart), with a nondecreasing relative clock.
 
 Journal files must not be changed, moved or rotated while a writer holds them.
