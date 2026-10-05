@@ -6,6 +6,9 @@ Broker facts and unresolved claims are recorded in the
 [assumption review](../research/2026-10-04-broker-assumptions.md).
 The user's RTX 3070 Ti / 32 GB RAM target and local Laya choice are assessed in the
 [hardware and trading-stack decision](../research/2026-10-04-laya-hardware-and-trading-stack.md).
+The [pivot and delivery decision](../research/2026-10-04-pivot-and-delivery-decision.md)
+now prioritizes the integrated daily shadow/paper workflow without a full rewrite;
+local AI and framework replacement are deferred from the critical path.
 
 ## Objective and boundaries
 
@@ -35,6 +38,7 @@ accepts only `simulation`; all other modes fail configuration validation.
 | A1: optional local text features | Timestamped fixed-taxonomy classification, calibrated abstention and controlled price-only comparison | Frozen labels/rubric/model revision; classification baselines; financial ablation and prospective evidence if training cutoff unknown | Planned; Laya is not integrated and has no order authority |
 | F1: framework compatibility study | Pinned NautilusTrader offline replay and IBKR adapter design; ib_async fallback if necessary | P&L equivalence, version-matched API/docs, A01–A14 mapped to adapter behavior, license/dependency review | Planned; no framework adopted for operational use |
 | V1: offline results view | Self-contained chart/cost/provenance/control snapshot dashboard | Automated report rendering, keyboard/mobile browser checks, loopback route restrictions | Implemented and opened locally; read-only offline snapshot |
+| S1: integrated shadow session | Causal completed-session signal, explicit synthetic quote/portfolio, independent admission and durable decision ledger | Buy/hold/sell/blocked rehearsal, exact retry, conflict/corruption/causality tests, portable CLI | Implemented offline; 178 total tests and full synthetic demo pass; no order authority |
 | M4: paper adapter | Account-scoped adapter, pacing scheduler, durable journal, operator runbook | Authorized paper tests including reconnect, uncertain submission and cancel/fill races | Not started; requires separate authorization for account actions |
 | M5: live readiness review | Instrument-specific risk policy, regulatory applicability review, operational drills and budget | Reviewed evidence and explicit live authorization | Not started; no live path authorized |
 
@@ -73,7 +77,7 @@ timeouts and CPU fallback as missing features. A feature-dependent strategy bloc
 new entries on missing features; deterministic exits/recovery remain available.
 No risk check, accounting calculation or order callback waits for model inference.
 
-Select NautilusTrader as the first F1 candidate, not an immediate replacement of
+The earlier F1 study selected NautilusTrader as the first candidate, not an immediate replacement of
 the tested reference software. Investigate stable `v1.231.0` with matching source
 and docs; current `latest` IBKR docs describe a different adapter generation.
 Use a separate Python 3.12 environment for the initial study and pin dependencies
@@ -82,11 +86,23 @@ contract, including fees, uncertain orders, snapshot consistency and restarts.
 If those mappings fail, evaluate a thin ib_async adapter rather than weakening
 controls. No broker connection is needed or authorized for F1's offline study.
 
-F1 and empirical M3 results precede account-level M4. Model experiments must not
+Framework adoption is now optional rather than a prerequisite for the next offline
+read-only callback study. Start from the pinned official SDK and review real-stream
+snapshot semantics; no framework replaces that work. Empirical M3 evidence and
+operational controls precede account-level paper-order M4 tests. Model experiments must not
 delay a valid price-only paper candidate if they fail to add useful evidence.
 No VPS, paid CLI workflow, cloud inference or complex deployment is selected.
 The current simulation journal requires POSIX locking; native Windows support
 is unverified, so use native Linux or WSL2 for the proposed local setup.
+
+S1's [shadow-session runbook](../operations/shadow-session-runbook.md) documents
+non-binding proposals, conservative synthetic NAV, settled-cash sizing, bid/ask
+cost convention and the freeze-once ledger. It does not reconcile IBKR streams or
+implement a real-time scheduler. Real sources, source normalization and a distinct
+read-only snapshot contract remain the next dependencies. The
+[read-only capture design](../superpowers/specs/2026-10-04-ibkr-readonly-snapshot-design.md)
+specifies separate broker observations, completion markers and readiness blockers;
+the collector is not implemented and no account reads have been performed.
 
 ## M1 risk and recovery contract
 

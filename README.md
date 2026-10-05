@@ -11,6 +11,19 @@ latched drawdown buy halts, dividend receivables, trade rejections and reproduci
 reports. The included example is invented data for software validation; no economic
 advantage or live readiness has been established.
 
+The current decision is **no complete rewrite**: preserve these foundations and
+prioritize an integrated daily shadow/paper workflow. The SPY rule remains an
+unproven benchmark. See the [pivot decision](docs/research/2026-10-04-pivot-and-delivery-decision.md).
+
+## Integrated daily shadow session
+
+The `session plan` workflow joins completed-session data, a declared schedule,
+synthetic portfolio/current-quote snapshots, independent cost-aware sizing and a
+durable decision ledger. Reports explain BUY/SELL proposals, HOLD or BLOCKED.
+It never imports a broker SDK, opens a socket, or submits/cancels orders. Snapshot
+declarations and model costs are not verified broker state or economic evidence.
+See the [shadow-session runbook](docs/operations/shadow-session-runbook.md).
+
 ## Run locally
 
 No third-party dependencies. Use Python 3.11+ on macOS or Linux; local validation
@@ -23,7 +36,8 @@ make check build demo
 
 This runs the tests, builds `dist/quant-system.pyz`, and creates a fresh directory
 under `.research-output/` with research, validation, holdout, all 14 control scenarios,
-and crash/restart artifacts. `summary.json` records the end-to-end result.
+and crash/restart artifacts, plus shadow buy/hold/sell/blocked reports and durable
+retry/conflict checks. `summary.json` records the end-to-end result.
 The portable archive supports `python3 dist/quant-system.pyz research ...` and
 `python3 dist/quant-system.pyz control ...`; it can run outside this checkout.
 
