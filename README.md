@@ -1,262 +1,264 @@
 # HFT-IBKR
 
-An offline research system for a whole-share, cash-funded, long-only SPY strategy.
-The initial hypothesis uses a 200-session moving average of a causal dividend-aware
-price index: hold when above the average, otherwise cash. Completed-close signals
-trade at the next supplied session's open. It is intended for daily/swing research.
+A daily trading-research system for **SPY**, the S&P 500 ETF. Once per trading day it
+decides whether a portfolio should hold SPY or cash. It uses free market data, records
+each decision in a ledger and can send it to your phone.
 
-The research engine compares the strategy with buy-and-hold under 1x, 2x and
-5x assumed execution costs. It includes independent cash/exposure/capacity limits,
-latched drawdown buy halts, dividend receivables, trade rejections and reproducible
-reports. The included example is invented data for software validation; no economic
-advantage or live readiness has been established.
+**It never places, changes or cancels orders.** Every decision is a *shadow* decision
+for a portfolio file you keep. Only you can trade.
 
-The current decision (2026-10-05) is **daily research on free real data**. The
-intraday order-flow branch is closed for the current account for three reasons:
+> **Not high-frequency trading, despite the name.** Research on 2026-10-05 closed the
+> intraday branch for the current account, for three reasons:
+>
+> - IBKR Lite has no API access.
+> - A cash account can only turn over about its capital each day.
+> - Order-flow signals showed no edge once the bid-ask spread was paid.
+>
+> See the [blueprint review](docs/research/2026-10-05-architecture-blueprint-review.md).
 
-- IBKR Lite has no API access.
-- Cash-account settlement caps daily turnover at about one times capital.
-- Exploratory replications found no edge before costs.
+## At a glance
 
-See the [blueprint review](docs/research/2026-10-05-architecture-blueprint-review.md).
-The pre-registered [`spy-daily-v1` study](studies/spy-daily-v1/PREREGISTRATION.md) runs
-the daily trend rule against buy-and-hold on raw SPY history from 2016. It uses free
-Alpaca data fetched by `python3 -m quant_data fetch-alpaca`, which needs a free Alpaca
-signup with no card; the data must not be redistributed. To set it up on Windows
-with WSL and test each trading day, follow the
-[Windows + WSL runbook](docs/operations/windows-wsl-runbook.md).
+| Question | Answer |
+| --- | --- |
+| What does it trade? | SPY only, long or cash, whole shares. No leverage, no shorting. |
+| How does it decide? | It holds SPY while SPY's dividend-adjusted price is above its moving average of the last N trading days. Otherwise it holds cash. |
+| How often? | Once per trading day, one minute after the 09:30 New York open. |
+| What data? | Daily closing prices through yesterday plus dividends, and one live quote to price the trade. All from Alpaca's free plan. |
+| What comes out? | `BUY n shares`, `SELL all`, `HOLD` or `BLOCKED` with reasons. Frozen in a ledger and pushed to your phone. |
+| Does it trade for me? | No. |
+| Does it make money? | Unknown. A [pre-registered study](studies/spy-daily-v1/PREREGISTRATION.md) on 2016–2026 history decides whether the rule has earned a shadow period. Past results would not guarantee future ones either way. |
 
-## Integrated daily shadow session
+## How it decides
 
-The `session plan` workflow joins completed-session data, a declared schedule,
-synthetic portfolio/current-quote snapshots, independent cost-aware sizing and a
-durable decision ledger. Reports explain BUY/SELL proposals, HOLD or BLOCKED.
-It never imports a broker SDK, opens a socket, or submits/cancels orders. Snapshot
-declarations and model costs are not verified broker state or economic evidence.
-See the [shadow-session runbook](docs/operations/shadow-session-runbook.md).
+The rule is in [`quant_research/strategy.py`](quant_research/strategy.py). It is
+deliberately simple: it has one tunable number, the lookback N.
 
-## Run locally
-
-No third-party dependencies. Use Python 3.11+ on macOS or Linux; local validation
-used Python 3.14.0. The control journal uses POSIX file locking.
-From the repository root:
-
-```sh
-make check build demo
-```
-
-This runs the tests, builds `dist/quant-system.pyz`, and creates a fresh directory
-under `.research-output/` with research, validation, holdout, all 14 control scenarios,
-and crash/restart artifacts, plus shadow buy/hold/sell/blocked reports and durable
-retry/conflict checks. `summary.json` records the end-to-end result.
-The portable archive supports `python3 dist/quant-system.pyz research ...` and
-`python3 dist/quant-system.pyz control ...`; it can run outside this checkout.
-
-## Results dashboard
-
-The automatic demo generates `dashboard.html` alongside its reports. It is a
-self-contained read-only view of equity curves, cost scenarios, final holdings,
-source hashes, assumptions and synthetic control states. The cost buttons update
-stored results without rerunning a strategy. No external assets or broker calls.
-
-![Offline research dashboard on invented data](docs/images/offline-research-dashboard.png)
-
-The archive provides `view render --research REPORT --control CONTROL_REPORT
---output NEW_HTML` (repeat `--control` as needed) and
-`view serve --page HTML --port 8765` to serve just that page on loopback. The
-dashboard is a snapshot, not a live account interface. Rejected configurations
-emit no final-state report; the demo still validates all 14 acceptance scenarios.
-
-## Paper Gateway connection diagnostic
-
-For a separately prepared paper Gateway, an optional official-SDK, non-ordering
-API connection diagnostic is available. See the
-[Windows/Ubuntu paper Gateway setup](docs/operations/paper-gateway-setup.md).
-It is not a broker adapter and is never invoked by the offline demo.
-
-## Local AI environment checks
-
-The diagnostic runs without installing Laya or downloading weights:
-
-```sh
-mkdir -p .research-output
-python3 -m quant_local preflight --output .research-output/local-preflight.json
-```
-
-The archive supports `python3 dist/quant-system.pyz local preflight --output PATH`.
-It inventories RAM, installed package versions and NVIDIA devices. If PyTorch is
-installed in the invoking environment, an isolated child performs a small CUDA
-tensor operation with a 30-second deadline. Use `--gpu-index N` for a logical
-PyTorch device or `--skip-cuda` to avoid importing PyTorch entirely.
-
-Exit 2 means blocked or invalid input; a blocked report lists the missing evidence.
-Exit 0 means only `ready_for_model_benchmark`. It does not mean Laya was run or
-that trading is ready. The combined-stack preflight targets Linux/WSL2 and Python
-3.12–3.14 with conservative memory budgets documented in the report. No packages
-are installed, no model is loaded, and no account is accessed. Existing output
-files are preserved; use a fresh filename for each run.
-
-## Individual research replay
-
-The data-intake pipeline now accepts separate local price, distribution and
-calendar exports with explicit source/license declarations. It produces one
-validated `.qdata` bundle atomically; generated bundles are excluded from Git.
-Research replay/evaluate/holdout accept `--bundle PATH` instead of the existing
-`--data` plus `--manifest` pair. `make demo` now prepares and inspects the synthetic
-bundle and confirms its financial results match the original fixture automatically.
-See the [intake design](docs/superpowers/specs/2026-10-04-data-intake-design.md).
-Source declarations remain unverified; no real historical dataset is included.
-
-For an individual research report:
-
-```sh
-mkdir -p .research-output
-python3 -m quant_research replay \
-  --data examples/synthetic_spy_daily.csv \
-  --manifest examples/synthetic_spy_manifest.json \
-  --config examples/research_config.json \
-  --output .research-output/synthetic-report.json
-```
-
-The output destination must not already exist. Choose another filename for another
-run. `--evaluation-start YYYY-MM-DD` selects a supplied session after at least
-`lookback` completed warmup sessions; default is the first eligible session.
-
-```sh
-python3 -m unittest discover -s tests -v
-python3 -m compileall -q quant_research quant_control scripts tests
-```
-
-Reports contain the input and source hashes, explicit configuration/provenance,
-all assumptions, next-open fills, fees, price friction, rejected trades, equity
-history and remaining positions/receivables. Decimal amounts serialize as strings.
-Exit 0 means valid replay completed (possibly with rejected trades), 2 means invalid
-input/output destination, and 1 means unexpected runtime failure.
-
-## Chronological evaluation
-
-Predeclare development, validation and holdout ranges and candidate lookbacks in
-a protocol. The example is entirely synthetic. Each interval starts flat with
-fresh capital, with preceding prices used only to warm causal features. The selector
-uses validation return at 2x costs, with a smaller lookback breaking ties. This
-illustrates a reproducible procedure; it does not establish statistical significance.
-
-```sh
-python3 -m quant_research evaluate \
-  --data examples/synthetic_spy_daily.csv \
-  --manifest examples/synthetic_spy_manifest.json \
-  --config examples/research_config.json \
-  --protocol examples/synthetic_protocol.json \
-  --registry .research-output/experiments.sqlite \
-  --run-id validation-1 \
-  --selection .research-output/selection.json \
-  --output .research-output/validation.json
-
-python3 -m quant_research holdout \
-  --data examples/synthetic_spy_daily.csv \
-  --manifest examples/synthetic_spy_manifest.json \
-  --config examples/research_config.json \
-  --protocol examples/synthetic_protocol.json \
-  --registry .research-output/experiments.sqlite \
-  --run-id holdout-1 \
-  --selection .research-output/selection.json \
-  --output .research-output/holdout.json
-```
-
-Validation reports exclude holdout results. Selection is bound to stored validation,
-input/config/protocol/source hashes, and an append-only registry. A holdout identity
-can be released once through that registry; interrupted releases remain consumed.
-The registry also claims every revealed holdout session per data kind and symbol, so
-renaming a protocol, editing code or shifting the window cannot re-release a session.
-Registries created before 2026-10-05 lack those session claims for earlier releases;
-start a fresh registry for a new study.
-Both reports include same-date buy-and-hold and zero-interest cash benchmarks under
-the declared cost scenarios. Completed reports remain recoverable without rerunning:
-
-```sh
-python3 -m quant_research recover \
-  --registry .research-output/experiments.sqlite \
-  --run-id holdout-1 --output .research-output/recovered-holdout.json
-```
-
-The registry guards local workflow mistakes. Copying datasets or deleting the
-registry can bypass that guard; it is not access control over market data.
-
-## Order controls and recovery
-
-`quant_control` accepts only the synthetic account `SIM`, simulation mode and SPY
-whole-share limit intents. It reserves cash/inventory before emitting simulated
-submissions and retains uncertain exposure through cancel timeouts, disconnects
-and restart. Duplicates do not apply cash flows or submit twice. Readiness requires
-complete coherent reconciliation and an explicit reset; refreshing stale data alone
-does not clear a halt. Kill requests cancellation while continuing to process fills.
-
-```sh
-python3 -m quant_control replay \
-  --fixture examples/control/A08.json \
-  --output .research-output/recovery-scenario.json
-
-python3 -m quant_control continue \
-  --fixture examples/control/A12.json \
-  --journal .research-output/control.jsonl \
-  --output .research-output/durable-control.json
-```
-
-Continuation records input durably before applying it. Reopening a journal appends
-restart, preserves IDs/reservations and enters reconciliation. Continuation fixtures
-must use the next absolute event sequence after that restart; inputs are never
-silently renumbered. The hash chain detects damaged records, and a single writer is
-enforced. Corruption or storage failure stops continuation. See the
-[operator runbook](docs/operations/offline-runbook.md) for recovery limits.
-
-## Input and model assumptions
-
-Use raw unadjusted daily OHLC, whole-share volume and distributions, with CSV header:
+**Step 1: a total-return price index.** On a dividend's ex-date, SPY's price drops by
+about the dividend amount. That isn't a real loss for an investor, so the rule follows
+an index that adds dividends back:
 
 ```text
-session,open,high,low,close,volume,dividend,dividend_pay_date
+index[first day] = close[first day]
+index[day t]     = index[day t-1] × (close[t] + dividend[t]) / close[t-1]
 ```
 
-The manifest must declare source, UTC retrieval date, raw-price policy, complete
-dividend coverage/no splits, CSV SHA-256 and exact expected sessions with a calendar
-source. The loader checks hashes and internal consistency; it cannot independently
-verify the provider's calendar, dividend coverage or licensing. Splits and adjusted
-prices are rejected. The example calendar is synthetic weekdays, not an exchange
-calendar; its SPY-labeled prices are invented.
+`dividend[t]` is the cash dividend going ex on day t, and zero on most days. The
+arithmetic uses exact fractions, so there is no rounding drift.
 
-Distributions accrue on ex-date for previously held shares, add to NAV and become
-spendable only on the simulated pay date. Entry sizing uses prior-close information
-and is reduced for current-open affordability. Capacity uses prior-session volume.
-Open gaps and closing marks both count toward drawdown. A halt blocks buys; it does
-not imply liquidation. An inadmissible full exit stays open and is reported.
+**Step 2: compare with its moving average.** With lookback N (100, 150 or 200 trading days):
 
-The example $10,000 cash balance, exposure/risk limits and fees are test assumptions,
-not a suggested capital allocation, calibrated impact model or exact IBKR fee quote.
-The simulator excludes tax, cash yield, settlement delays, partial-fill queues and
-live auction behavior. Fund expenses are already reflected in market prices and
-are not subtracted twice. End positions remain marked; the last signal is unfilled.
+```text
+average[t] = mean of index over the last N trading days, including day t
+signal[t]  = LONG  if index[t] >  average[t]
+             CASH  if index[t] <= average[t]   (a tie counts as CASH)
+             WARMUP until N days of history exist
+```
 
-## Design and progress
+**Step 3: turn yesterday's signal into today's action.**
 
-- [Market/strategy decision and R1 design](docs/superpowers/specs/2026-10-04-etf-trend-research-design.md)
-- [R1 implementation/evidence](docs/superpowers/plans/2026-10-04-etf-trend-research.md)
-- [Delivery plan and full risk/recovery contract](docs/plans/quant-trading-delivery-plan.md)
-- [M1 order/reconciliation implementation plan](docs/superpowers/plans/2026-10-04-offline-control-engine.md)
-- [Chronological evaluation plan](docs/superpowers/plans/2026-10-04-chronological-evaluation.md)
-- [Dated broker assumption review](docs/research/2026-10-04-broker-assumptions.md)
-- [Local Laya hardware fit and trading-stack selection](docs/research/2026-10-04-laya-hardware-and-trading-stack.md)
-- [Microstructure-alpha blueprint review, replications and G3 power](docs/research/2026-10-05-architecture-blueprint-review.md)
-- [Historical architecture proposal](docs/plans/optimize-quant-trading-system.md)
+| Signal at yesterday's close | Shares held now | Action |
+| --- | --- | --- |
+| LONG | none | **BUY** |
+| LONG | some | **HOLD**, never rebalanced or topped up |
+| CASH | some | **SELL** every share |
+| CASH | none | **HOLD** |
 
-The offline research, chronological evaluation and M1 order/recovery reference
-software are implemented. Strategy validation still needs reviewed historical data
-and calibrated execution assumptions. The actual IBKR adapter and account-level
-paper tests remain to be built; synthetic coherent snapshots are not an IBKR API
-feature. This build cannot connect to a broker or submit actual orders.
-The local environment preflight tool is implemented. Laya inference/model
-benchmarking and a NautilusTrader compatibility study remain planned extensions.
-Neither model nor framework is installed or integrated; the trading build uses algorithms.
-Strict data intake and the read-only results dashboard are also implemented.
-Historical validation and broker integration remain outstanding.
-Broker account access, paper/live orders, paid services and deployment require
-separate explicit authorization.
+Positions are all-in or all-out. A rule like this usually changes position a few
+times a year; most days the answer is HOLD.
+
+**Which N?** The study tests N = 100, 150 and 200. It picks the one with the highest
+return over 2021-01-11 to 2023-06-30 after doubling all costs; a tie goes to the
+smaller N. It freezes that choice, then tests it once on 2023-07-11 to 2026-10-02.
+The daily runner then uses the frozen N automatically. Until the study has run, it
+uses the original 200-day hypothesis.
+
+## When it acts
+
+All times are New York time. The runner reads the exchange calendar (from Alpaca), so
+holidays, 1 pm early closes and daylight-saving changes are handled.
+
+```text
+Day 1  16:00  Market closes. Day 1's closing price completes the signal for day 2.
+Day 2  06:00  Runner wakes, or starts whenever you launch it. It reads the calendar:
+              trading day?  -> wait for the open
+              holiday?      -> "Market closed today", sleep until tomorrow
+       09:31  One minute after the open:
+                1. download daily bars through day 1, plus dividends and calendar
+                2. re-check the data (see "What can block a decision")
+                3. compute the signal from day 1's close
+                4. take SPY's live quote and size the trade
+                5. apply every gate, record ONE decision for day 2, send it to your phone
+       later  Nothing. One decision per trading day.
+Day 3  06:00  Wakes again.
+```
+
+- **No look-ahead.** A day's decision uses only prices through the previous close.
+  Today's prices never affect today's signal; the code enforces this and tests check it.
+- **Execution is at or after the open.** The historical study models the same timing:
+  signal at one day's close, simulated fill at the next day's open.
+- **Outside 09:30–16:00 nothing is recorded.** Starting early only prepares the data.
+- **Decisions are frozen.** Each session's decision is stored once in a SQLite ledger.
+  Rerunning that day reprints it, and different inputs for a decided day are refused.
+
+## How big a trade is
+
+For a **BUY**, the target is whole shares worth about **95%** of the shadow portfolio's
+value at the current ask price. It is then reduced until every limit holds. These
+values come from [`studies/spy-daily-v1/config.json`](studies/spy-daily-v1/config.json):
+
+| Limit | Rule |
+| --- | --- |
+| Cash | price × shares + fees must not exceed *settled* cash |
+| Position size | at most 98% of the portfolio's value |
+| Share cap | at most 1,000 shares |
+| Order size | at most $100,000 per order |
+| Liquidity | at most 0.1% of SPY's previous-session volume |
+
+A **SELL** is always the full position. The portfolio is valued at the live bid:
+`value = cash + shares × bid`.
+
+## What can block a decision
+
+The data is checked **before** any decision. If any check fails, the download stops
+and nothing is written:
+
+- daily bars must match the exchange calendar exactly;
+- every quarter must have a dividend;
+- bar timestamps must be New York midnight;
+- daily bars must agree with regular-session minute bars on ten sample days.
+
+Then each of these **gates** can turn a decision into `BLOCKED`, with the reason shown:
+
+| Reason | Meaning |
+| --- | --- |
+| `OUTSIDE_EXECUTION_WINDOW`, `QUOTE_BEFORE_OPEN` | Not inside today's trading session |
+| `SIGNAL_NOT_COMPLETED` | Yesterday's close is not final yet |
+| `CAUSAL_COVERAGE` | Downloaded history doesn't match the calendar |
+| `WARMUP` | Fewer than N days of history |
+| `STALE_QUOTE`, `FUTURE_QUOTE` | Quote older than 60 s, or timestamped in the future (check the PC clock) |
+| `STALE_ACCOUNT`, `FUTURE_ACCOUNT` | Portfolio snapshot older than 5 minutes, or timestamped in the future |
+| `HALTED` | You set `"halted": true` in your portfolio file: a manual stop for everything |
+| `DRAWDOWN_LIMIT` | Portfolio is 20% or more below its peak. Blocks new **buys** only; exits stay allowed. |
+| `CASH_LIMIT`, `EXPOSURE_LIMIT`, `CAPACITY_LIMIT`, … | No whole-share size fits the limits above |
+
+## What it assumes about costs
+
+| Cost | Assumption |
+| --- | --- |
+| Commission | $0 (IBKR Lite on US ETFs) |
+| Sell fees | 0.3 basis points of the sale, covering the SEC Section 31 fee and FINRA's trading activity fee |
+| Spread, live | Already paid by pricing buys at the ask and sells at the bid |
+| Slippage and impact | +1.5 bp per side live; +2 bp per side in the historical study (half-spread 0.5, slippage 1, impact 0.5) |
+| Stress | The study reports results at 1×, 2× and 5× these costs and decides at 2× |
+
+Not modeled: taxes, interest on idle cash, and auction or price-improvement details.
+
+## How it all fits together
+
+```mermaid
+flowchart LR
+  A["Alpaca free API<br/>daily bars, dividends, calendar"] -->|"fetch-alpaca<br/>fail-closed checks"| B["prices.csv, distributions.csv,<br/>calendar.csv, metadata.json"]
+  B -->|"quant_data prepare"| C[("spy.qdata<br/>validated, hashed bundle")]
+  Q["Alpaca real-time<br/>IEX quote"] --> L["session live-inputs<br/>schedule + snapshot"]
+  P["portfolio.json<br/>your shadow book"] --> L
+  C --> D["session plan<br/>signal, sizing, gates"]
+  L --> D
+  S["study's frozen N"] --> D
+  D --> E[("ledger.sqlite<br/>one decision per day")]
+  D --> F["plan.json"]
+  F --> N["ntfy push<br/>phone or browser"]
+```
+
+| Piece | What it does |
+| --- | --- |
+| [`scripts/run_daily.sh`](scripts/run_daily.sh) | The one command you start. Runs the study once if needed, then each trading day waits for the open, runs `daily_shadow.sh` and sends notifications. Stop with Ctrl-C. |
+| [`scripts/daily_shadow.sh`](scripts/daily_shadow.sh) | One day's pipeline: fetch → prepare → live inputs → plan → summary. Safe to rerun. |
+| [`scripts/run_study.sh`](scripts/run_study.sh) + [`scripts/study_verdict.py`](scripts/study_verdict.py) | The one-time pre-registered study and its mechanical verdict |
+| `quant_data` | Free-data download (`fetch-alpaca`) and strict intake into a hashed `.qdata` bundle |
+| `quant_research` | The rule, cost model, risk limits, backtest, chronological evaluation and single-use holdout registry |
+| `quant_session` | Live inputs, the daily planner, the freeze-once ledger and the market clock |
+
+The shadow book is `.research-output/shadow/portfolio.json`. **Nothing updates it for
+you.** If you want the shadow to "follow" a BUY, edit the file: shares bought, cash
+reduced by about shares × price. If you don't, it will keep proposing the same BUY.
+
+## Is the rule any good? The pre-registered study
+
+[`studies/spy-daily-v1`](studies/spy-daily-v1/PREREGISTRATION.md) fixed the data,
+periods, candidates, costs and decision rule in Git *before* any real data was
+downloaded. Results therefore can't be fitted after the fact.
+
+1. **Data:** raw daily SPY prices and dividends, 2016 to 2026-10-02.
+2. **Periods:** 2016 is warm-up; 2017–2020 development; 2021-01-11 to 2023-06-30
+   validation picks N; 2023-07-11 to 2026-10-02 is the **holdout**. There are 5-session
+   gaps between periods, and each period starts with fresh $50,000 cash.
+3. **Single release:** the holdout can be released exactly once. The registry refuses
+   any rerun, rename or overlapping window.
+4. **Verdict at 2× costs** against buy-and-hold over the same days:
+
+| Outcome | Condition | Consequence |
+| --- | --- | --- |
+| DOMINATES | Return ≥ buy-and-hold **and** max drawdown ≤ buy-and-hold | Shadow it |
+| RISK_REDUCING | Lower return, but lower max drawdown | Shadow it only as a risk-control overlay |
+| DOMINATED | Max drawdown not lower than buy-and-hold | Reject the rule for this period |
+
+A negative return blocks any shadow. Honest limits:
+
+- The whole period is public history, and the 200-day rule is widely known.
+- It is one asset and one price path, with few trades.
+- No statistical significance is claimed. Only the forward shadow period is truly out of sample.
+
+## Get started
+
+On **Windows + WSL**, follow the step-by-step
+[Windows + WSL runbook](docs/operations/windows-wsl-runbook.md). The short version, in
+the Ubuntu terminal:
+
+```sh
+git clone -b FrankieBiz/feat-hft-research-review https://github.com/FrankieBiz/HFT-IBKR.git
+cd HFT-IBKR && make check build demo      # tests, portable build and offline demo
+./scripts/run_daily.sh --check            # verifies keys, calendar and phone notifications
+./scripts/run_daily.sh                    # leave running; Ctrl-C to stop
+```
+
+Requirements:
+
+- Python 3.11+ on Linux, WSL or macOS. No third-party packages.
+- A free Alpaca paper account (email only, no card); keys go in `~/.config/alpaca/paper.env`.
+- Optionally, the free ntfy app for phone notifications; the channel name goes in
+  `~/.config/hft-ibkr/notify.env`.
+
+The IB Gateway is not needed. An optional read-only API check is in the runbook.
+
+## Files and data
+
+| Path | Contents |
+| --- | --- |
+| `studies/spy-daily-v1/` | Pre-registration, protocol and config, committed before any data |
+| `.research-output/` | Everything generated: data, bundles, reports, ledger and `shadow/run.log`. Ignored by Git. |
+| `~/.config/alpaca/paper.env` | Your Alpaca keys. Never committed or printed. |
+
+Alpaca's terms allow personal, non-commercial use and forbid redistribution. The tools
+refuse to write Alpaca data anywhere in this repository except the ignored
+`.research-output/`.
+
+## Other components
+
+These are offline reference tools from earlier work. Commands are in the
+[component reference](docs/reference/components.md).
+
+- **Research engine:** replay, chronological evaluation and single-use holdouts with
+  1×/2×/5× costs, dividend receivables, drawdown halts and rejected-trade reports.
+- **Order-control reference (SIM only):** a fail-closed reservation, reconciliation and
+  journal model with 14 acceptance scenarios. It is not an IBKR adapter.
+- **Results dashboard:** a static HTML view of research and control reports.
+- **Paper Gateway check:** a read-only API handshake test. It requests no data and sends no orders.
+- **Local GPU preflight:** an environment inventory for possible future model work.
+
+## Research history
+
+- [Blueprint review: microstructure claims, replications and test power](docs/research/2026-10-05-architecture-blueprint-review.md)
+- [HFT research decision](docs/research/2026-10-05-hft-research-decision.md) and the closed [order-flow plan](docs/plans/hft-edge-research-plan.md)
+- [Daily trend design](docs/superpowers/specs/2026-10-04-etf-trend-research-design.md) and [delivery plan](docs/plans/quant-trading-delivery-plan.md)
+- [Broker assumptions](docs/research/2026-10-04-broker-assumptions.md) and [AI model decision](docs/research/2026-10-04-ai-model-decision.md)
+- [Original architecture proposal (historical)](docs/plans/optimize-quant-trading-system.md)

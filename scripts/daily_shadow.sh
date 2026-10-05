@@ -7,14 +7,15 @@
 #
 # Environment overrides:
 #   ALPACA_ENV  file with APCA_API_KEY_ID / APCA_API_SECRET_KEY (default ~/.config/alpaca/paper.env)
-#   CONFIG      strategy config (default studies/spy-daily-v1/config.json)
+#   CONFIG      strategy config (default: studies/spy-daily-v1/config.json with the study's
+#               frozen lookback from .research-output/spy-daily-v1/selection.json, if any)
 #   PORTFOLIO   shadow book you maintain (default .research-output/shadow/portfolio.json)
 #   PYTHON      interpreter (default python3)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ALPACA_ENV=${ALPACA_ENV:-$HOME/.config/alpaca/paper.env}
-CONFIG=${CONFIG:-studies/spy-daily-v1/config.json}
+CONFIG=${CONFIG:-}
 PORTFOLIO=${PORTFOLIO:-.research-output/shadow/portfolio.json}
 PYTHON=${PYTHON:-python3}
 ROOT=.research-output/shadow
@@ -27,11 +28,14 @@ print(today, today - timedelta(days=1))')
 DAY=$ROOT/$TODAY
 
 summary() {
-  "$PYTHON" - "$1" <<'EOF'
+  "$PYTHON" - "$1" "$DAY/config.json" <<'EOF'
 import json, sys
+from pathlib import Path
 report = json.load(open(sys.argv[1]))
+config = Path(sys.argv[2])
+lookback = f"SMA {json.load(config.open())['lookback']}" if config.is_file() else 'custom config'
 print(f"{report['execution_session']}: {report['status']}  signal={report['signal']} "
-      f"(from {report['signal_session']} close)  quote={report['quote_scope']}")
+      f"(from {report['signal_session']} close, {lookback})  quote={report['quote_scope']}")
 if report['proposal']:
     p = report['proposal']
     print(f"  proposal: {p['side']} {p['quantity']} SPY near {p['reference_price']} "
@@ -67,6 +71,21 @@ if [[ ! -f $DAY/spy.qdata ]]; then
   "$PYTHON" -m quant_data prepare --prices "$DAY/alpaca/prices.csv" \
     --distributions "$DAY/alpaca/distributions.csv" --calendar "$DAY/alpaca/calendar.csv" \
     --metadata "$DAY/alpaca/metadata.json" --output "$DAY/spy.qdata"
+fi
+if [[ -z $CONFIG ]]; then
+  CONFIG=$DAY/config.json
+  if [[ ! -f $CONFIG ]]; then
+    # The study's validation picks the lookback; until it has run, use the 200 hypothesis.
+    "$PYTHON" - "$CONFIG" <<'EOF'
+import json, sys
+from pathlib import Path
+config = json.load(open('studies/spy-daily-v1/config.json'))
+selection = Path('.research-output/spy-daily-v1/selection.json')
+if selection.is_file():
+    config['lookback'] = json.load(selection.open())['selected_lookback']
+Path(sys.argv[1]).write_text(json.dumps(config, indent=2) + '\n')
+EOF
+  fi
 fi
 # A failed earlier attempt may have left inputs from an older quote; take a fresh one.
 rm -f "$DAY/schedule.json" "$DAY/snapshot.json"
