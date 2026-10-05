@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.gateway-venv/
 .research-output/
 dist/
 *.qdata

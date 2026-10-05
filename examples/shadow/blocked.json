@@ -1,0 +1,31 @@
+{
+  "account": "SIM",
+  "currency": "USD",
+  "execution_session": "2024-10-08",
+  "mode": "offline_shadow",
+  "now": "2024-10-08T14:00:00+00:00",
+  "policy": {
+    "max_account_age_seconds": 60,
+    "max_quote_age_seconds": 10
+  },
+  "portfolio": {
+    "as_of": "2024-10-08T14:00:00+00:00",
+    "cash": "10000",
+    "halted": false,
+    "nav": "10000.000000",
+    "peak_nav": "10000.000000",
+    "pending_orders": 0,
+    "reconciled": true,
+    "settled_cash": "10000",
+    "shares": 0,
+    "uncertain_orders": 0
+  },
+  "quote": {
+    "as_of": "2024-10-08T13:58:00+00:00",
+    "ask": "128.012800",
+    "bid": "127.987200",
+    "data_type": "synthetic"
+  },
+  "schema_version": 1,
+  "symbol": "SPY"
+}

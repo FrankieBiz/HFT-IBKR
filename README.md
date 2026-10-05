@@ -11,6 +11,22 @@ latched drawdown buy halts, dividend receivables, trade rejections and reproduci
 reports. The included example is invented data for software validation; no economic
 advantage or live readiness has been established.
 
+The current decision is **pivot the research, preserve the foundations**. Test
+whether short-horizon SPY order-flow signals survive executable spreads, fees and
+delay before building more trading features. The daily rule remains a separate
+unproven benchmark; intraday models are not implemented. See the
+[HFT research review](docs/research/2026-10-05-hft-research-decision.md) and
+[authoritative research plan](docs/plans/hft-edge-research-plan.md).
+
+## Integrated daily shadow session
+
+The `session plan` workflow joins completed-session data, a declared schedule,
+synthetic portfolio/current-quote snapshots, independent cost-aware sizing and a
+durable decision ledger. Reports explain BUY/SELL proposals, HOLD or BLOCKED.
+It never imports a broker SDK, opens a socket, or submits/cancels orders. Snapshot
+declarations and model costs are not verified broker state or economic evidence.
+See the [shadow-session runbook](docs/operations/shadow-session-runbook.md).
+
 ## Run locally
 
 No third-party dependencies. Use Python 3.11+ on macOS or Linux; local validation
@@ -23,7 +39,8 @@ make check build demo
 
 This runs the tests, builds `dist/quant-system.pyz`, and creates a fresh directory
 under `.research-output/` with research, validation, holdout, all 14 control scenarios,
-and crash/restart artifacts. `summary.json` records the end-to-end result.
+and crash/restart artifacts, plus shadow buy/hold/sell/blocked reports and durable
+retry/conflict checks. `summary.json` records the end-to-end result.
 The portable archive supports `python3 dist/quant-system.pyz research ...` and
 `python3 dist/quant-system.pyz control ...`; it can run outside this checkout.
 
@@ -41,6 +58,13 @@ The archive provides `view render --research REPORT --control CONTROL_REPORT
 `view serve --page HTML --port 8765` to serve just that page on loopback. The
 dashboard is a snapshot, not a live account interface. Rejected configurations
 emit no final-state report; the demo still validates all 14 acceptance scenarios.
+
+## Paper Gateway connection diagnostic
+
+For a separately prepared paper Gateway, an optional official-SDK, non-ordering
+API connection diagnostic is available. See the
+[Windows/Ubuntu paper Gateway setup](docs/operations/paper-gateway-setup.md).
+It is not a broker adapter and is never invoked by the offline demo.
 
 ## Local AI environment checks
 

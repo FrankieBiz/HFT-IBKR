@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 from build import ROOT, build
+from shadow_demo import shadow_workflows
 
 
 def demo(folder):
@@ -71,6 +72,7 @@ def demo(folder):
              'holdout_repeat':'rejected','holdout_recovery':'byte_identical',
              'control_replay':'byte_identical','durable_restart':'reconciliation_required',
              'broker_connection':'not_implemented','artifacts':str(folder)}
+    summary.update(shadow_workflows(run, ROOT, folder, bundle))
     controls=[]
     for number in range(1,15):
         if number==3:  # Invalid configuration intentionally emits no replay report.
