@@ -158,6 +158,10 @@ python3 -m quant_research holdout \
 Validation reports exclude holdout results. Selection is bound to stored validation,
 input/config/protocol/source hashes, and an append-only registry. A holdout identity
 can be released once through that registry; interrupted releases remain consumed.
+The registry also claims every revealed holdout session per data kind and symbol, so
+renaming a protocol, editing code or shifting the window cannot re-release a session.
+Registries created before 2026-10-05 lack those session claims for earlier releases;
+start a fresh registry for a new study.
 Both reports include same-date buy-and-hold and zero-interest cash benchmarks under
 the declared cost scenarios. Completed reports remain recoverable without rerunning:
 
@@ -233,6 +237,7 @@ are not subtracted twice. End positions remain marked; the last signal is unfill
 - [Chronological evaluation plan](docs/superpowers/plans/2026-10-04-chronological-evaluation.md)
 - [Dated broker assumption review](docs/research/2026-10-04-broker-assumptions.md)
 - [Local Laya hardware fit and trading-stack selection](docs/research/2026-10-04-laya-hardware-and-trading-stack.md)
+- [Microstructure-alpha blueprint review, replications and G3 power](docs/research/2026-10-05-architecture-blueprint-review.md)
 - [Historical architecture proposal](docs/plans/optimize-quant-trading-system.md)
 
 The offline research, chronological evaluation and M1 order/recovery reference

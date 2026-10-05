@@ -54,6 +54,15 @@ no PROFITABLE/READY state awarded by a backtest. No minimum trades per hour is s
   with zero incremental strategy costs; research development spending is reported
   separately from recurring deployment costs.
 
+**Data budget resolved 2026-10-05: $0.** No purchased data or paid subscriptions.
+Zero-cost routes are compared in the
+[blueprint review](../research/2026-10-05-architecture-blueprint-review.md#data-route-for-g0).
+The leading candidate is Alpaca's free historical consolidated SIP quotes, which need
+a free signup and allow no redistribution. IBKR's free Cboe One + IEX live entitlement
+can support a prospective recorder. Exploratory checks have already viewed
+2025-09-16 (NVDA, Arca) and 2012-06-21 (Nasdaq samples); exclude both dates from any
+study window.
+
 **Exit:** all required fields resolved with sources, or a documented blocked/rejected
 route. A code scaffold, a successful TCP connection or free delayed quotes is not
 exit evidence. Costs/subscriptions and account access remain unperformed until the
@@ -224,7 +233,14 @@ concatenate until the original number of sessions is reached, truncate excess, a
 use the fifth percentile of resampled means (linear interpolation between sorted
 order statistics) as the one-sided lower bound. Freeze the RNG implementation/version
 in the manifest. This percentile bootstrap is a proposed pilot procedure, not a claim
-to implement the studentized Sharpe test in Ledoit-Wolf. A 30-session test provides few effective blocks: intervals can be
+to implement the studentized Sharpe test in Ledoit-Wolf.
+
+**Power disclosure (simulated 2026-10-05, Gaussian daily P&L):** with 30 sealed
+sessions the full rule passes about 5% of zero-edge strategies, but only about 17% at
+a true annualized Sharpe of 2 and 49% at 5. At 60 sessions those become about 22% and
+75%. INCONCLUSIVE is therefore the expected verdict for modest real edges. Decide
+before freezing G1 whether to lengthen the sealed window; see the
+[blueprint review](../research/2026-10-05-architecture-blueprint-review.md#the-g3-sealed-test-detects-only-very-large-edges). A 30-session test provides few effective blocks: intervals can be
 unstable. It is a pilot, not proof of regime durability or a universal power target.
 
 - [ ] Require positive held-out mean and a one-sided 95% lower bound above zero for
