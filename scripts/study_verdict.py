@@ -45,16 +45,26 @@ def verdict(report):
                 for row in report['scenarios'] if row['cost_multiplier'] != PRIMARY_MULTIPLIER}}
 
 
+def brief(result):
+    percent = lambda value: f'{Decimal(value) * 100:.1f}%'
+    trend, hold = result['trend_2x'], result['buy_hold_2x']
+    return (f"{result['outcome']} (proceed to shadow: {'yes' if result['proceed_to_shadow'] else 'no'}). "
+            f"Holdout at 2x costs, SMA {result['selected_lookback']}: trend return {percent(trend['total_return'])}, "
+            f"max drawdown {percent(trend['maximum_drawdown'])}; buy-and-hold {percent(hold['total_return'])}, "
+            f"{percent(hold['maximum_drawdown'])}.")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('holdout', type=Path)
+    parser.add_argument('--brief', action='store_true', help='one-line summary for notifications')
     args = parser.parse_args(argv)
     try:
         result = verdict(json.loads(args.holdout.read_text()))
     except (OSError, ValueError, KeyError, TypeError, ArithmeticError) as error:
         print(f'verdict error: {error}', file=sys.stderr)
         return 2
-    print(json.dumps(result, indent=2))
+    print(brief(result) if args.brief else json.dumps(result, indent=2))
     return 0
 
 

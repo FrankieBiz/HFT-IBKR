@@ -11,6 +11,7 @@ free Alpaca data. The Gateway step only checks whether an API session can open.
 | Once, any time | Step 4: run the pre-registered study and read its verdict | ~5 min |
 | Once, Gateway logged in | Step 5: read-only API connection check | ~15 min |
 | Each trading day, 09:30–16:00 New York | Step 6: `./scripts/daily_shadow.sh` records the day's decision | ~1 min |
+| Unattended, checked from your phone | Step 7: `./scripts/run_daily.sh` waits for the open and notifies you | start once |
 
 The strategy is daily: one decision per session, from the previous close. Running
 it more often adds nothing. A second run the same day just reprints the recorded
@@ -193,6 +194,56 @@ price. The IEX quote is one venue's price, not the national best quote. The stra
 config is the pre-registered one (`CONFIG=...` overrides it). Do not trade real money
 on these proposals unless step 4's verdict supports it. Even then, it is a historical
 replay, not proof of future returns.
+
+## 7. Leave it running and check it from your phone
+
+`scripts/run_daily.sh` runs the one-time study if it hasn't run, then waits for each
+open. One minute after the open it records the day's decision. It posts status to a
+private [ntfy](https://ntfy.sh) channel you can read on a phone or in any browser.
+Only status text is sent: started, verdict, decision and errors, never keys or
+account data. Anyone who knows the channel name can read it, so keep it private.
+
+Once, create the channel and test it:
+
+```sh
+mkdir -p ~/.config/hft-ibkr && chmod 700 ~/.config/hft-ibkr
+echo "NTFY_TOPIC=hft-ibkr-$(python3 -c 'import secrets; print(secrets.token_urlsafe(12))')" > ~/.config/hft-ibkr/notify.env
+chmod 600 ~/.config/hft-ibkr/notify.env
+cat ~/.config/hft-ibkr/notify.env          # your private channel name
+./scripts/run_daily.sh --check             # your phone should get "Setup check passed"
+```
+
+To read the channel:
+
+- **Phone:** install the free **ntfy** app, tap **+**, and subscribe to that name on `ntfy.sh`.
+- **Mac or any browser:** open `https://ntfy.sh/<your channel name>`.
+
+Before leaving the computer:
+
+- In Windows **Settings → System → Power → Screen and sleep**, set sleep when plugged in
+  to **Never**. A sleeping PC pauses everything.
+- Keep the Ubuntu window open; minimizing is fine. Closing it stops the runner.
+
+Then start it:
+
+```sh
+cd ~/HFT-IBKR && ./scripts/run_daily.sh
+```
+
+Expected notifications:
+
+| Notification | Meaning |
+| --- | --- |
+| **HFT-IBKR started** | Runner is up |
+| **Study verdict** | First run only |
+| **Waiting for the open** | Includes the minutes until 09:31 New York |
+| **Today's decision** | Recorded shortly after 09:31 |
+| **… FAILED** | Includes the last error lines; the runner keeps going |
+
+If nothing arrives by about 09:40 New York time, the PC slept, lost network or the
+window was closed. The same lines are always in `.research-output/shadow/run.log`.
+It keeps going day after day until you press Ctrl-C. `--once` handles only today.
+To update later, run `git pull` in `~/HFT-IBKR`.
 
 ## Troubleshooting
 

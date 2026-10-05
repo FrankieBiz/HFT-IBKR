@@ -5,7 +5,7 @@ validates. The portfolio stays a user-maintained declaration for the SIM shadow 
 no broker is queried and no order exists anywhere in this path. The free plan's
 real-time quote is IEX's own best bid/offer: one venue, not the national best quote.
 """
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 
 from quant_data.alpaca import DATA_URL, NEW_YORK, _calendar_sessions, _decimal, _get_json
 from quant_research.serde import InputError, decimal_value, strict_keys, whole
@@ -79,3 +79,25 @@ def build_snapshot(portfolio, quote, now, today):
                           'shares': shares, 'as_of': stamp, 'reconciled': True, 'pending_orders': 0,
                           'uncertain_orders': 0, 'halted': portfolio['halted']},
             'policy': dict(POLICY)}
+
+
+def market_clock(calendar, now, *, after_open=timedelta(minutes=1), wake=time(6, 0)):
+    """Return (state, seconds until today's run, seconds until tomorrow's wake-up).
+
+    state is 'open' (a session runs today and has not closed), 'closed' (no session
+    today) or 'after' (today's session already closed). Times follow the exchange
+    calendar in New York time, so holidays, early closes and DST are handled.
+    """
+    if now.utcoffset() is None:
+        raise InputError('timezone-aware time required')
+    today = now.astimezone(NEW_YORK).date()
+    wake_at = datetime.combine(today + timedelta(days=1), wake, tzinfo=NEW_YORK)
+    until_wake = max(60, int((wake_at - now).total_seconds()))
+    sessions = [item for item in calendar if isinstance(item, dict) and item.get('date') == today.isoformat()]
+    if not sessions:
+        return 'closed', 0, until_wake
+    _, opening, closing = _calendar_sessions(sessions, today, today)[0]
+    run_at = _session_instant(today, opening) + after_open
+    if now >= _session_instant(today, closing):
+        return 'after', 0, until_wake
+    return 'open', max(0, int((run_at - now).total_seconds())), until_wake

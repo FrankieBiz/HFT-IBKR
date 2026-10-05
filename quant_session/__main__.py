@@ -16,7 +16,7 @@ from quant_research.config import parse_config
 from quant_research.serde import InputError, canonical_json
 from .inputs import parse_schedule, parse_snapshot, read_document
 from .ledger import DecisionLedger
-from .live import build_schedule, build_snapshot, latest_quote
+from .live import build_schedule, build_snapshot, latest_quote, market_clock
 from .planner import plan_session
 
 
@@ -56,6 +56,8 @@ def main(argv=None):
     plan = commands.add_parser('plan')
     for field in ('bundle','config','schedule','snapshot','ledger','output'):
         plan.add_argument('--'+field, required=True, type=Path)
+    commands.add_parser('market-clock', help='Print "<open|closed|after> <seconds to run> <seconds to '
+                        'next wake>" for today from the Alpaca calendar (used by scripts/run_daily.sh).')
     live = commands.add_parser('live-inputs', help='Render today\'s schedule and snapshot from the free '
                                'Alpaca calendar and IEX quote (keys from APCA_API_KEY_ID / APCA_API_SECRET_KEY).')
     for field in ('bundle','portfolio','schedule-out','snapshot-out'):
@@ -64,6 +66,11 @@ def main(argv=None):
     try:
         if args.command == 'live-inputs':
             return live_inputs(args)
+        if args.command == 'market-clock':
+            now = _now()
+            day = now.astimezone(NEW_YORK).date().isoformat()
+            print(*market_clock(fetch_calendar(environment_transport(), day, day), now))
+            return 0
         inputs = (args.bundle,args.config,args.schedule,args.snapshot)
         if args.ledger.resolve() in {path.resolve() for path in inputs}:
             raise InputError('ledger must differ from input paths')

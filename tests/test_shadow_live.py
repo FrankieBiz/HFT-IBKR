@@ -12,7 +12,7 @@ from quant_data.bundle import prepare_bundle
 from quant_research.serde import InputError
 from quant_session import __main__ as session_cli
 from quant_session.inputs import parse_schedule, parse_snapshot
-from quant_session.live import build_schedule, build_snapshot, latest_quote
+from quant_session.live import build_schedule, build_snapshot, latest_quote, market_clock
 from test_data_intake import inputs
 from test_inputs import raw_config
 
@@ -108,6 +108,30 @@ class LiveInputTests(unittest.TestCase):
                         self.assertRaisesRegex(InputError, 'market is closed now; run between 09:30 and 16:00'):
                     session_cli.live_inputs(args, transport=fake_alpaca())
             self.assertFalse((folder / 'snapshot.json').exists())
+
+    def test_market_clock_follows_the_exchange_calendar(self):
+        def at(day, clock, offset):  # local New York wall time given with its UTC offset
+            return datetime.fromisoformat(f'{day}T{clock}{offset}')
+        regular = [{'date': '2026-10-06', 'open': '09:30', 'close': '16:00'}]
+        early = [{'date': '2026-11-27', 'open': '09:30', 'close': '13:00'}]
+        cases = [
+            # 06:30 EDT: run at 09:31, three hours one minute later; wake at 06:00 tomorrow.
+            (regular, at('2026-10-06', '06:30:00', '-04:00'), ('open', 3 * 3600 + 60, 23 * 3600 + 30 * 60)),
+            (regular, at('2026-10-06', '11:00:00', '-04:00'), ('open', 0, 19 * 3600)),
+            (regular, at('2026-10-06', '16:00:00', '-04:00'), ('after', 0, 14 * 3600)),
+            ([], at('2026-10-10', '06:30:00', '-04:00'), ('closed', 0, 23 * 3600 + 30 * 60)),
+            (early, at('2026-11-27', '13:30:00', '-05:00'), ('after', 0, 16 * 3600 + 30 * 60)),
+            # DST ends 2026-11-01: the next 06:00 EST wake-up is 24.5 wall hours (25.5 real) away.
+            ([{'date': '2026-10-31', 'open': '09:30', 'close': '16:00'}],
+             at('2026-10-31', '05:30:00', '-04:00'), ('open', 4 * 3600 + 60, 25 * 3600 + 30 * 60)),
+        ]
+        for calendar, now, expected in cases:
+            with self.subTest(now=now):
+                self.assertEqual(market_clock(calendar, now), expected)
+        friday = at('2026-10-09', '17:00:00', '-04:00')
+        self.assertEqual(market_clock([{'date': '2026-10-09', 'open': '09:30', 'close': '16:00'}], friday)[0], 'after')
+        with self.assertRaises(InputError):
+            market_clock(regular, datetime(2026, 10, 6, 6, 30))
 
     def test_existing_outputs_are_never_replaced(self):
         with tempfile.TemporaryDirectory() as tmp:

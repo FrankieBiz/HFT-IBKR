@@ -37,6 +37,12 @@ class StudyVerdictTests(unittest.TestCase):
                 self.assertEqual((result['outcome'], result['proceed_to_shadow']), (outcome, proceed))
                 self.assertEqual(set(result['sensitivities_only']), {'1x', '5x'})
 
+    def test_brief_summary_is_one_readable_line(self):
+        result = study_verdict.verdict(report({1: ('0.3', '0.1'), 2: ('0.1', '0.12'), 5: ('0', '0.2')}, HOLD))
+        self.assertEqual(study_verdict.brief(result),
+                         'RISK_REDUCING (proceed to shadow: yes). Holdout at 2x costs, SMA 150: trend return '
+                         '10.0%, max drawdown 12.0%; buy-and-hold 29.0%, 20.0%.')
+
     def test_only_a_released_holdout_is_judged(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'validation.json'
