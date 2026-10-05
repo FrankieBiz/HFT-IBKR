@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "protocol_id": "spy-daily-v1",
+  "embargo_sessions": 5,
+  "candidate_lookbacks": [
+    100,
+    150,
+    200
+  ],
+  "selection_metric": "validation_return_under_2x_cost",
+  "development_start": "2017-01-03",
+  "development_end": "2020-12-31",
+  "validation_start": "2021-01-11",
+  "validation_end": "2023-06-30",
+  "holdout_start": "2023-07-11",
+  "holdout_end": "2026-10-02"
+}

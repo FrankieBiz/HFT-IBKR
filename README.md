@@ -11,12 +11,18 @@ latched drawdown buy halts, dividend receivables, trade rejections and reproduci
 reports. The included example is invented data for software validation; no economic
 advantage or live readiness has been established.
 
-The current decision is **pivot the research, preserve the foundations**. Test
-whether short-horizon SPY order-flow signals survive executable spreads, fees and
-delay before building more trading features. The daily rule remains a separate
-unproven benchmark; intraday models are not implemented. See the
-[HFT research review](docs/research/2026-10-05-hft-research-decision.md) and
-[authoritative research plan](docs/plans/hft-edge-research-plan.md).
+The current decision (2026-10-05) is **daily research on free real data**. The
+intraday order-flow branch is closed for the current account for three reasons:
+
+- IBKR Lite has no API access.
+- Cash-account settlement caps daily turnover at about one times capital.
+- Exploratory replications found no edge before costs.
+
+See the [blueprint review](docs/research/2026-10-05-architecture-blueprint-review.md).
+The pre-registered [`spy-daily-v1` study](studies/spy-daily-v1/PREREGISTRATION.md) runs
+the daily trend rule against buy-and-hold on raw SPY history from 2016. It uses free
+Alpaca data fetched by `python3 -m quant_data fetch-alpaca`, which needs a free Alpaca
+signup with no card; the data must not be redistributed.
 
 ## Integrated daily shadow session
 

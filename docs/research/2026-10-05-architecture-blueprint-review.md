@@ -168,6 +168,31 @@ Excluded under this decision:
    Cboe One + IEX entitlement. It tests whether tick-by-tick BidAsk is available and
    measures receipt delay for G4; it does not select models.
 
+## Account facts close the intraday route (2026-10-05)
+
+The user reported IBKR Lite, a cash account, $25k–$100k for this strategy, and no
+data purchases.
+
+- **No API on Lite.** IBKR's [plan comparison](https://www.interactivebrokers.com/en/general/compare-lite-pro.php)
+  (header "IBKR Lite | IBKR Pro") marks "IBKR APIs" as not included for Lite. It uses
+  the same marker as other Lite-excluded rows, such as institutional accounts.
+  Automated Gateway/API trading therefore requires IBKR Pro. Pro brings back per-order
+  commissions (Tiered minimum $0.35), which exceed the predicted moves measured above.
+- **Cash-account turnover ceiling.** Settled cash must fund each intraday round trip.
+  A same-day sale of a position bought with unsettled proceeds is a good-faith or
+  freeriding violation. Daily traded notional is therefore at most about settled
+  capital, so daily profit is at most capital × net edge per round trip. At a net
+  0.5 bp per trip, several spreads more than any edge observed here, $50,000 earns
+  about $2.50 per day.
+- **Lite fees.** Zero commission; sells pay the SEC Section 31 fee of $20.60 per
+  million from 2026-04-04 ([Federal Register](https://www.federalregister.gov/documents/2026/03/04/2026-04233)).
+  FINRA's TAF is waived from 2026-10-01 to 2026-12-31 ([notice](https://www.federalregister.gov/documents/2026/09/23/2026-19392)).
+
+**Decision:** the intraday order-flow branch is closed for this account. The project
+returns to daily and slower research, which fits a cash account and one manual
+order per day on Lite. It uses free Alpaca daily bars, dividends and the exchange
+calendar under the pre-registered [`spy-daily-v1`](../../studies/spy-daily-v1/PREREGISTRATION.md) study.
+
 ## What this means for the project
 
 The repository's strongest asset is its **research and failure discipline**:

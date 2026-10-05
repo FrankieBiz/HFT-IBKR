@@ -1,5 +1,22 @@
 # Executable order-flow edge: research and delivery plan
 
+> **Closed for the current account, 2026-10-05.** G0 resolved to *reject this route*.
+> The user's account is IBKR Lite and a cash account, with a $0 data budget.
+>
+> - IBKR's plan comparison lists the IBKR APIs as unavailable on Lite, so the
+>   Gateway/API execution path does not exist for this account.
+> - Cash-account settlement caps each day's traded notional at about settled capital.
+>   Profit per day is therefore bounded by capital times the net edge per round trip.
+>   Even an edge several spreads larger than anything observed would be worth only a
+>   few dollars a day.
+>
+> Exploratory replications found no edge before costs anyway (see the
+> [blueprint review](../research/2026-10-05-architecture-blueprint-review.md)).
+> Reopen only if the account becomes IBKR Pro with margin, and then re-cost the route
+> under Pro commissions. Research priority returns to the daily study in
+> [`studies/spy-daily-v1`](../../studies/spy-daily-v1/PREREGISTRATION.md). The text
+> below is preserved as the specification of record.
+
 Updated 2026-10-05. **Authoritative research priority.** Supersedes the daily-first
 priority in the October 4 pivot decision, while preserving its implemented software
 and operational controls. Evidence: [research decision](../research/2026-10-05-hft-research-decision.md)
@@ -298,7 +315,7 @@ decision with actual limits, account/regulatory review and explicit authorizatio
 ## Definition of progress
 
 Track unresolved assumptions, frozen experiments, rejected hypotheses and calibrated
-cost/delay envelopes. Current status is **G0 unresolved, G1 design drafted but not frozen, G2-G4 not run**.
+cost/delay envelopes. Current status is **closed at G0 for the current Lite cash account (2026-10-05); G1 not frozen; G2-G4 not run**.
 This planning revision and literature review are complete artifacts; empirical work
 remains open. The next build is the smallest causal event-data/replay experiment
 supported by G0, not a new AI trader or another claim that the system is finished.
