@@ -191,7 +191,8 @@ Reading the result:
 After a `PROPOSED` decision nothing happens anywhere. To let the shadow book follow
 it, edit `portfolio.json` as if filled: shares, and cash reduced by about quantity ×
 price. The IEX quote is one venue's price, not the national best quote. The strategy
-config is the pre-registered one (`CONFIG=...` overrides it). Do not trade real money
+uses the pre-registered config with the lookback the study selected, or 200 before
+the study has run; `CONFIG=...` overrides it. Do not trade real money
 on these proposals unless step 4's verdict supports it. Even then, it is a historical
 replay, not proof of future returns.
 
