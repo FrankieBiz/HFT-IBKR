@@ -7,6 +7,8 @@ each decision in a ledger and can send it to your phone.
 **It never places, changes or cancels orders.** Every decision is a *shadow* decision
 for a portfolio file you keep. Only you can trade.
 
+**New here? Start with [SETUP.md](SETUP.md).**
+
 > **Not high-frequency trading, despite the name.** Research on 2026-10-05 closed the
 > intraday branch for the current account, for three reasons:
 >
@@ -210,7 +212,8 @@ A negative return blocks any shadow. Honest limits:
 
 ## Get started
 
-On **Windows + WSL**, follow the step-by-step
+**Follow [SETUP.md](SETUP.md)**: copy-paste steps for Windows + WSL, with a check
+after each step. More detail is in the
 [Windows + WSL runbook](docs/operations/windows-wsl-runbook.md). The short version, in
 the Ubuntu terminal:
 
