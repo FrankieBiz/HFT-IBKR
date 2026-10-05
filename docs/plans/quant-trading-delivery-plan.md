@@ -33,6 +33,7 @@ accepts only `simulation`; all other modes fail configuration validation.
 | Milestone | Deliverable | Exit evidence | Status |
 | --- | --- | --- | --- |
 | M0: correct the baseline | Dated broker review, risk contract and scoped implementation tasks | Primary links; review of contradictions and failure cases | Completed planning review |
+| G0 support: intraday economics | Strict offline cost/quantity/frequency grid, fee-cap solver and settled-cash funding bound | Hand-calculated boundaries, synthetic report and portable CLI parity | Implemented; conditional assumptions only; full G0 remains unresolved |
 | R1: daily ETF research slice | SPY trend signals, next-open replay, independent cash/exposure gates, dividends, cost scenarios and buy-and-hold comparison | Tests, independent review, deterministic synthetic CLI replay | Implemented; validation evidence in R1 plan |
 | M1: offline control engine | Risk decisions, order reservations, reconciliation and deterministic scenario replay | All acceptance scenarios below pass with no network access | Implemented offline; acceptance fixtures/tests pass |
 | M2: reviewed historical data and calibrated replay | Strict local export intake, reviewed datasets, calendar/corporate actions, empirical fee/spread/slippage/impact assumptions | Provider/license review, hand-calculated P&L, historical sensitivity report | Intake/bundle mechanics implemented; actual historical inputs and calibration outstanding |

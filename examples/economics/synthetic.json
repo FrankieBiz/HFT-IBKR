@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "evidence": "synthetic",
+  "source_notes": "Invented sensitivity inputs, not a broker quote, real SPY price, or recommended capital allocation. Third-party fees are uncalibrated placeholders.",
+  "instrument": "SPY",
+  "currency": "USD",
+  "reference_mid": "100",
+  "settled_cash": "10000",
+  "cash_buffer": "500",
+  "max_entry_notional": "5000",
+  "quantities": [
+    1,
+    10,
+    50,
+    100
+  ],
+  "round_trips_per_session": [
+    0,
+    1,
+    5,
+    20
+  ],
+  "scheduled_sessions": [
+    "2026-10-01",
+    "2026-10-02",
+    "2026-10-05",
+    "2026-10-06",
+    "2026-10-07",
+    "2026-10-08",
+    "2026-10-09",
+    "2026-10-12",
+    "2026-10-13",
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16",
+    "2026-10-19",
+    "2026-10-20",
+    "2026-10-21",
+    "2026-10-22",
+    "2026-10-23",
+    "2026-10-26",
+    "2026-10-27",
+    "2026-10-28",
+    "2026-10-29",
+    "2026-10-30"
+  ],
+  "calendar_notes": "Invented weekday schedule for software demonstration; not a verified exchange calendar.",
+  "monthly_recurring_cost": "44",
+  "startup_cost": "100",
+  "movement_increment": "0.0001",
+  "buy_fee": {
+    "per_share": "0.0035",
+    "minimum": "0.35",
+    "cap_fraction": "0.01",
+    "external_per_order": "0.02",
+    "external_per_share": "0.001",
+    "external_fraction": "0"
+  },
+  "sell_fee": {
+    "per_share": "0.0035",
+    "minimum": "0.35",
+    "cap_fraction": "0.01",
+    "external_per_order": "0.02",
+    "external_per_share": "0.001",
+    "external_fraction": "0.00002"
+  },
+  "scenarios": [
+    {
+      "name": "base",
+      "entry_spread": "0.01",
+      "exit_spread": "0.01",
+      "entry_slippage": "0.001",
+      "exit_slippage": "0.001",
+      "entry_impact": "0.001",
+      "exit_impact": "0.001"
+    },
+    {
+      "name": "double_slippage_impact",
+      "entry_spread": "0.01",
+      "exit_spread": "0.01",
+      "entry_slippage": "0.002",
+      "exit_slippage": "0.002",
+      "entry_impact": "0.002",
+      "exit_impact": "0.002"
+    }
+  ]
+}

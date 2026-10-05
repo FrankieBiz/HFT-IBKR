@@ -18,6 +18,32 @@ unproven benchmark; intraday models are not implemented. See the
 [HFT research review](docs/research/2026-10-05-hft-research-decision.md) and
 [authoritative research plan](docs/plans/hft-edge-research-plan.md).
 
+## Intraday economic feasibility
+
+The offline economics tool calculates required mid-price movement across explicit
+quantity, trade-count and friction assumptions. It models per-side commission
+minimums/caps, external fees, spread, slippage/impact and recurring overhead, and
+flags exposure and settled-cash funding violations. Exit fees depend on exit price;
+sale proceeds never replenish the constant-price funding bound.
+
+```sh
+mkdir -p .research-output
+python3 -m quant_economics assess \
+  --config examples/economics/synthetic.json \
+  --output .research-output/economics.json
+```
+
+The archive supports `economics assess` with the same arguments; `make demo`
+includes this report. The example contains invented assumptions. Every input is
+required; unknown real costs must not be filled with zero. Reports remain
+`conditional_analysis`, with `g0_complete: false`, even for affordable rows.
+Exit 0 means the calculation completed; it does not mean feasibility or an edge
+was established. Exit 2 rejects invalid inputs or an existing output destination.
+Fees are continuous estimates, one fully filled order per side; invoice rounding,
+partial fills, latency, liquidity and multi-day settlement need subsequent replay.
+See the [design and sources](docs/superpowers/specs/2026-10-05-intraday-economics-design.md)
+and [next evidence gates](docs/research/2026-10-05-economics-and-edge-gates.md).
+
 ## Integrated daily shadow session
 
 The `session plan` workflow joins completed-session data, a declared schedule,

@@ -73,6 +73,12 @@ def demo(folder):
              'control_replay':'byte_identical','durable_restart':'reconciliation_required',
              'broker_connection':'not_implemented','artifacts':str(folder)}
     summary.update(shadow_workflows(run, ROOT, folder, bundle))
+    run('economics','assess','--config',ROOT/'examples/economics/synthetic.json',
+        '--output',folder/'economics.json')
+    economics=json.loads((folder/'economics.json').read_text())
+    if economics['status']!='conditional_analysis' or economics['g0_complete']:
+        raise RuntimeError('economics report overstated evidence')
+    summary['intraday_economics']=economics['status']
     controls=[]
     for number in range(1,15):
         if number==3:  # Invalid configuration intentionally emits no replay report.

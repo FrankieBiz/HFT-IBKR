@@ -4,7 +4,8 @@ Updated 2026-10-05. **Authoritative research priority.** Supersedes the daily-fi
 priority in the October 4 pivot decision, while preserving its implemented software
 and operational controls. Evidence: [research decision](../research/2026-10-05-hft-research-decision.md)
 and its three linked primary-source reviews. This document specifies experiments;
-none of the proposed intraday modules or results exists yet.
+intraday feature/replay modules and empirical results remain absent. The G0
+conditional economics calculator is implemented; it is not a strategy backtest.
 
 ## Decision
 
@@ -29,12 +30,20 @@ no PROFITABLE/READY state awarded by a backtest. No minimum trades per hour is s
 | Risk/recovery reducer and journal | Implemented for narrow synthetic account semantics | Retain as reference; real fees/streams require additional design |
 | Offline dashboard, data bundle, shadow-session ledger | Implemented | Reuse provenance/reproducibility patterns, not daily data schemas blindly |
 | Gateway readiness diagnostic | Implemented; target API handshake not independently verified | Does not collect prices, reconcile accounts or place orders |
+| G0 cost/funding sensitivity | Implemented in `quant_economics`; synthetic example | Conditional break-even and constant-price funding bound; no G0 completion |
 | Real intraday event data and license | Absent | First empirical dependency |
 | Order-flow features, causal intraday labels and replay | Not implemented | Build only after data/economics contract |
 | Measured edge, real fill/latency calibration | Absent | No performance claim |
 | Paper/live adapters | Not implemented | Separate future work and action-specific authorization |
 
 ## G0 - economic and data feasibility before a model build
+
+Software support: `python3 -m quant_economics assess --config FILE --output NEW_FILE`.
+The [design](../superpowers/specs/2026-10-05-intraday-economics-design.md) records
+equations, limitations and dated sources. Use it to falsify an unaffordable route
+before fitting a model. Do not treat its grid as predicted trade frequency or
+optimize size/frequency against realized returns. Freeze a single primary quantity
+and cost policy using independent inputs; retain unfavorable sensitivities.
 
 - [ ] Create `docs/research/hft-review/experiment-manifest.json` only once real inputs
   can be specified; unresolved required fields must block freezing, not default to zero.
@@ -58,6 +67,41 @@ no PROFITABLE/READY state awarded by a backtest. No minimum trades per hour is s
 route. A code scaffold, a successful TCP connection or free delayed quotes is not
 exit evidence. Costs/subscriptions and account access remain unperformed until the
 specific action is authorized. Preparation and public-document review can continue.
+
+### Evidence ledger required for G0 exit
+
+| Unresolved decision | Evidence needed | Current state |
+| --- | --- | --- |
+| Capital and account constraints | Declared settled capital, cash reserve, max position/loss, account/entity and verified settlement rules | Unknown; no account access requested |
+| Data budget and access path | Authorized monthly/one-time budget; historical and prospective rights; exact feed/schema/sample | No licensed intraday dataset |
+| All-in cost schedule | Actual pricing/route, fee minima/caps/rounding, external fees, recurring bills and startup cost | Synthetic calculator only |
+| Time semantics | Event/receipt clock definitions, timestamp granularity, sequence/gap/correction behavior; documented historical/live mapping | Not measured |
+| Execution envelope | Independently justified feed/order/report delay and tails; impact, depth participation, expiry/recovery bounds | Not calibrated |
+| Complete calendar and evaluation window | Full session and settlement calendars, predetermined 122-session window, held-out isolation | Not frozen |
+
+Public fee documentation is context; it does not identify the user's actual account
+or complete bill. Separate unknown inputs from a documented zero charge. A feed
+sample may first be schema-checked offline if the user already has licensed files.
+Access, purchases or observation through a broker remain separately authorized.
+
+### Meaning of success
+
+The first pilot tests net incremental dollars versus not operating the strategy.
+It does not establish market outperformance. Before making that broader claim,
+freeze a separate benchmark evaluation: same dates and initial capital, SPY total
+return with implementable whole-share/cash treatment and its own trading costs,
+plus an eligible cash alternative using sourced yield/eligibility assumptions.
+Report idle cash, exposure, volatility, drawdown, turnover and paired daily return
+differences; a lower-risk or lower-exposure result alone is not evidence of alpha.
+Do not add this objective retroactively after seeing test results. The initial G3
+pilot remains a bounded gate to further evidence, with its stated primary method.
+
+Research priorities stay ordered: economics/data contract, causal features and
+labels, hand-audited replay, sealed evaluation, prospective cohort, operational
+readiness. Freeze numerical failure limits before evaluation. If a route fails,
+record the rejection before considering a new horizon, instrument or access path;
+register that change as a new experiment with fresh final data. Avoid endlessly
+adding models or hardware in response to a failed held-out result.
 
 ## G1 - freeze the first experiment
 
@@ -286,3 +330,6 @@ cost/delay envelopes. Current status is **G0 unresolved, G1 design drafted but n
 This planning revision and literature review are complete artifacts; empirical work
 remains open. The next build is the smallest causal event-data/replay experiment
 supported by G0, not a new AI trader or another claim that the system is finished.
+The economics calculator now supplies reproducible conditional tables and funding
+bounds. It does not resolve the evidence ledger or authorize G2 construction from
+an invented feed schema.
