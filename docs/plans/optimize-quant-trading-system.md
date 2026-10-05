@@ -1,6 +1,7 @@
 > **Historical proposal — superseded for implementation (2026-10-04).**
 > This document is retained for context, not as a validated specification. Use the
-> [current delivery plan](quant-trading-delivery-plan.md) and its
+> [current HFT research plan](hft-edge-research-plan.md), the
+> [software delivery record](quant-trading-delivery-plan.md) and its
 > [dated broker corrections](../research/2026-10-04-broker-assumptions.md).
 > In particular, do not implement the authentication bypass in section 4.3,
 > treat the latency/slippage/availability claims as guarantees, use the incorrect

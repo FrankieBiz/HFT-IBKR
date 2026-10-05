@@ -1,5 +1,10 @@
 # Pivot decision and delivery priorities
 
+**Historical decision:** the daily-first sequencing below was superseded on
+2026-10-05 by the [HFT research decision](2026-10-05-hft-research-decision.md)
+and [research plan](../plans/hft-edge-research-plan.md). Preserve this record for
+provenance; it is not the current research priority.
+
 Decision date: 2026-10-04. **No complete rewrite. Change delivery priority toward
 an integrated daily shadow/paper workflow.** The SPY 200-session trend rule remains
 an unproven benchmark, not a selected profitable strategy. No intraday trade-count

@@ -1,14 +1,17 @@
 # Quant trading delivery plan
 
-Updated 2026-10-04. This is the current planning baseline and supersedes conflicting
-claims in the [historical proposal](optimize-quant-trading-system.md).
+Updated 2026-10-05. This document records the implemented software and its control
+contracts. The [HFT edge research plan](hft-edge-research-plan.md) is authoritative
+for current research priorities and supersedes conflicting sequencing below. Both
+supersede the [historical proposal](optimize-quant-trading-system.md).
 Broker facts and unresolved claims are recorded in the
 [assumption review](../research/2026-10-04-broker-assumptions.md).
 The user's RTX 3070 Ti / 32 GB RAM target and local Laya choice are assessed in the
 [hardware and trading-stack decision](../research/2026-10-04-laya-hardware-and-trading-stack.md).
-The [pivot and delivery decision](../research/2026-10-04-pivot-and-delivery-decision.md)
-now prioritizes the integrated daily shadow/paper workflow without a full rewrite;
-local AI and framework replacement are deferred from the critical path.
+The [October 5 research decision](../research/2026-10-05-hft-research-decision.md)
+replaces the daily-first priority: validate a bounded intraday order-flow hypothesis
+after data/economic feasibility. Daily research remains a benchmark. Local AI,
+framework replacement and further broker features are outside the immediate critical path.
 
 ## Objective and boundaries
 
@@ -56,19 +59,17 @@ account data or submitting/cancelling orders. Its fake-client, timeout and SDK
 protobuf compatibility checks are complete; the real Windows/WSL connection remains
 unverified. This is setup tooling, not implementation of the M4 paper adapter.
 
-## Revised local architecture and priorities
+## Current priority and retained architecture constraints
 
-Choose daily/swing ETF research for the present desktop and broker scope. Keep
-SPY long-or-cash trend as an unproven baseline, with cash and buy-and-hold comparisons.
-Prioritize after-cost return, drawdown, turnover and capacity evidence rather than
-maximizing win rate. No market or model is presumed most profitable.
+The next empirical work follows G0-G4 in the [HFT edge research plan](hft-edge-research-plan.md).
+G0 needs licensed event-data semantics, affordable size, actual costs and a justified
+latency envelope. Intraday feature/replay modules are proposed, not implemented.
+Daily M2/M3 remain incomplete and may supply a separate benchmark; they cannot
+validate intraday order-flow signals. Do not treat the implemented S1 daily shadow
+workflow as completion of the HFT objective.
 
-M2 historical data and calibrated assumptions remain the critical path. H0 can run
-independently on the target machine; A1 cannot support financial conclusions until
-timestamped licensed text and pretrained-data contamination have been addressed.
-Predeclare a bounded trial budget and acceptance limits before validation. Preserve
-the current price-only baseline while testing one text-assisted variant. Adopt
-Laya features only if measured benefit survives costs and failure cases.
+Retain the following optional AI/framework architecture constraints if those branches
+are later reopened. They are not the selected next milestones.
 
 Laya runs in a separate process/environment without credentials. Begin with one
 English checkpoint, batch one and a 512-token cap; measure actual residency rather
@@ -99,7 +100,7 @@ S1's [shadow-session runbook](../operations/shadow-session-runbook.md) documents
 non-binding proposals, conservative synthetic NAV, settled-cash sizing, bid/ask
 cost convention and the freeze-once ledger. It does not reconcile IBKR streams or
 implement a real-time scheduler. Real sources, source normalization and a distinct
-read-only snapshot contract remain the next dependencies. The
+read-only snapshot contract remain dependencies for that daily/broker branch. The
 [read-only capture design](../superpowers/specs/2026-10-04-ibkr-readonly-snapshot-design.md)
 specifies separate broker observations, completion markers and readiness blockers;
 the collector is not implemented and no account reads have been performed.

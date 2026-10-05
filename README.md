@@ -11,9 +11,12 @@ latched drawdown buy halts, dividend receivables, trade rejections and reproduci
 reports. The included example is invented data for software validation; no economic
 advantage or live readiness has been established.
 
-The current decision is **no complete rewrite**: preserve these foundations and
-prioritize an integrated daily shadow/paper workflow. The SPY rule remains an
-unproven benchmark. See the [pivot decision](docs/research/2026-10-04-pivot-and-delivery-decision.md).
+The current decision is **pivot the research, preserve the foundations**. Test
+whether short-horizon SPY order-flow signals survive executable spreads, fees and
+delay before building more trading features. The daily rule remains a separate
+unproven benchmark; intraday models are not implemented. See the
+[HFT research review](docs/research/2026-10-05-hft-research-decision.md) and
+[authoritative research plan](docs/plans/hft-edge-research-plan.md).
 
 ## Integrated daily shadow session
 
