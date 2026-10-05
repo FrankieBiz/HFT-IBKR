@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "cash": "50000",
+  "settled_cash": "50000",
+  "shares": 0,
+  "peak_nav": "50000",
+  "halted": false
+}

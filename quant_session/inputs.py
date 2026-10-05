@@ -1,4 +1,4 @@
-"""Bounded strict local JSON declarations for synthetic shadow sessions."""
+"""Bounded strict local JSON declarations for shadow sessions."""
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 from quant_research.serde import InputError, _pairs, decimal_value, iso_date, strict_keys, whole
 
 MAX_DOCUMENT = 1024 * 1024
+# A live IEX quote is one venue's best bid/offer, declared as such; never the NBBO.
+QUOTE_TYPES = ('synthetic', 'alpaca_iex_realtime')
 NY = ZoneInfo('America/New_York')
 
 
@@ -70,12 +72,12 @@ def parse_snapshot(raw):
                   now=timestamp(raw['now'],'now'))
     quote = raw['quote']
     strict_keys(quote, ('bid','ask','as_of','data_type'), 'quote')
-    if quote['data_type'] != 'synthetic':
-        raise InputError('only synthetic quotes supported')
+    if quote['data_type'] not in QUOTE_TYPES:
+        raise InputError('unsupported quote data_type')
     result['quote'] = {key: decimal_value(quote[key],key,positive=True) for key in ('bid','ask')}
     if result['quote']['bid'] > result['quote']['ask']:
         raise InputError('crossed quote')
-    result['quote'].update(as_of=timestamp(quote['as_of'],'quote as_of'),data_type='synthetic')
+    result['quote'].update(as_of=timestamp(quote['as_of'],'quote as_of'),data_type=quote['data_type'])
     portfolio = raw['portfolio']
     strict_keys(portfolio, ('cash','settled_cash','nav','peak_nav','shares','as_of','reconciled',
                             'pending_orders','uncertain_orders','halted'), 'portfolio')

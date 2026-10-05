@@ -1,4 +1,4 @@
-"""Causal synthetic planning joined to independent research admission."""
+"""Causal shadow planning joined to independent research admission."""
 import hashlib
 from dataclasses import asdict, replace
 from decimal import Decimal
@@ -10,7 +10,7 @@ from quant_research.strategy import trend_signals
 LIMITATIONS = [
     'Non-binding offline rehearsal; no orders, broker connection or execution authority.',
     'Strategy validation is unproven; illustrative costs are not calibrated fills.',
-    'Snapshot, quote, reconciliation and schedule are synthetic declarations, not independently verified.',
+    'Portfolio, reconciliation and schedule are declarations, not broker-verified; a live IEX quote is one venue, not the NBBO.',
     'Historical source declarations remain unreviewed; schedule is not exchange-certified.',
     'Effective NAV excludes unpaid dividends and other assets; no broker balance-sheet equivalence.',
     'A declared halt blocks every proposal; a drawdown breach blocks entries only, as in the backtest.',
@@ -33,7 +33,7 @@ def plan_session(dataset, config, schedule, snapshot, source_hashes=None):
     input_digest = hashlib.sha256(canonical_json({
         'config':asdict(config), 'schedule':schedule, 'snapshot':snapshot}).encode()).hexdigest()
     report = {'schema_version':1, 'mode':'offline_shadow', 'account':'SIM','symbol':'SPY','currency':'USD',
-        'snapshot_scope':'synthetic', 'quote_scope':'synthetic', 'data_kind':dataset.manifest['kind'],
+        'snapshot_scope':'declared', 'quote_scope':quote['data_type'], 'data_kind':dataset.manifest['kind'],
         'strategy_validation':'unproven', 'execution_session':snapshot['execution_session'],
         'signal_session':None, 'signal':None, 'status':'BLOCKED', 'proposal':None,
         'blockers':[], 'consumed_causal_bars':0, 'declared_nav':portfolio['nav'],
