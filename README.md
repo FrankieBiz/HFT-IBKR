@@ -44,6 +44,32 @@ partial fills, latency, liquidity and multi-day settlement need subsequent repla
 See the [design and sources](docs/superpowers/specs/2026-10-05-intraday-economics-design.md)
 and [next evidence gates](docs/research/2026-10-05-economics-and-edge-gates.md).
 
+## Daily edge evidence diagnostics
+
+`quant_evidence` assesses one candidate's declared 30-session outcomes, including
+every scheduled day and three required execution stresses. It subtracts explicit
+variable and recurring costs and reports daily mean, drawdown, worst day and profit
+excluding the best day. The primary series receives 10,000 moving-block resamples
+at each of three fixed block lengths. Unbounded outcomes stay inconclusive;
+declared constraint failures reject the numerical criteria.
+
+```sh
+mkdir -p .research-output
+python3 -m quant_evidence assess \
+  --input examples/evidence/synthetic.json \
+  --output .research-output/edge-evidence.json
+```
+
+The invented example has positive mean P&L concentrated in one day and remains
+inconclusive. The archive supports `evidence assess`; `make demo` includes it.
+Exit 0 means a diagnostic was produced, even when it rejects a candidate. Exit 2
+means invalid input or an unavailable output path. All reports remain
+`diagnostic_only`, `promotion_allowed: false`, `g3_complete: false`.
+Costs, data provenance, scenario construction and calendar completeness are supplied
+declarations. This tool does not enforce holdout isolation or selection corrections,
+and its pilot intervals do not establish market outperformance. See the
+[design and method](docs/superpowers/specs/2026-10-05-edge-evidence-design.md).
+
 ## Integrated daily shadow session
 
 The `session plan` workflow joins completed-session data, a declared schedule,

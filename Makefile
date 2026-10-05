@@ -5,7 +5,7 @@ test:
 	$(PYTHON) -m unittest discover -s tests -v
 
 check: test
-	$(PYTHON) -m compileall -q quant_research quant_control quant_local quant_data quant_view quant_session quant_economics scripts tests
+	$(PYTHON) -m compileall -q quant_research quant_control quant_local quant_data quant_view quant_session quant_economics quant_evidence scripts tests
 	git diff --check
 
 build:

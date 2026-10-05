@@ -79,6 +79,13 @@ def demo(folder):
     if economics['status']!='conditional_analysis' or economics['g0_complete']:
         raise RuntimeError('economics report overstated evidence')
     summary['intraday_economics']=economics['status']
+    run('evidence','assess','--input',ROOT/'examples/evidence/synthetic.json',
+        '--output',folder/'edge-evidence.json')
+    evidence=json.loads((folder/'edge-evidence.json').read_text())
+    if (evidence['status']!='diagnostic_only' or evidence['promotion_allowed']
+            or evidence['numeric_assessment']!='inconclusive'):
+        raise RuntimeError('invented concentrated profits should remain inconclusive')
+    summary['edge_evidence']=evidence['status']
     controls=[]
     for number in range(1,15):
         if number==3:  # Invalid configuration intentionally emits no replay report.

@@ -6,6 +6,8 @@ and operational controls. Evidence: [research decision](../research/2026-10-05-h
 and its three linked primary-source reviews. This document specifies experiments;
 intraday feature/replay modules and empirical results remain absent. The G0
 conditional economics calculator is implemented; it is not a strategy backtest.
+G3 daily evidence arithmetic is also implemented as a standalone diagnostic;
+empirical G3 evaluation and promotion controls remain unperformed.
 
 ## Decision
 
@@ -31,6 +33,7 @@ no PROFITABLE/READY state awarded by a backtest. No minimum trades per hour is s
 | Offline dashboard, data bundle, shadow-session ledger | Implemented | Reuse provenance/reproducibility patterns, not daily data schemas blindly |
 | Gateway readiness diagnostic | Implemented; target API handshake not independently verified | Does not collect prices, reconcile accounts or place orders |
 | G0 cost/funding sensitivity | Implemented in `quant_economics`; synthetic example | Conditional break-even and constant-price funding bound; no G0 completion |
+| G3 daily evidence diagnostics | Implemented in `quant_evidence`; synthetic example | Cost/uncertainty/stress arithmetic; no holdout enforcement or G3 completion |
 | Real intraday event data and license | Absent | First empirical dependency |
 | Order-flow features, causal intraday labels and replay | Not implemented | Build only after data/economics contract |
 | Measured edge, real fill/latency calibration | Absent | No performance claim |
@@ -258,6 +261,15 @@ them as progress toward an edge. A third-party replay candidate requires a pinne
 version, license review and a hand-audited equivalence check before adoption.
 
 ## G3 - economic acceptance and rejection
+
+Standalone arithmetic support is available through `python3 -m quant_evidence
+assess --input FILE --output NEW_FILE`; see the
+[diagnostic contract](../superpowers/specs/2026-10-05-edge-evidence-design.md).
+It accepts one declared 30-session candidate cohort with primary, double-friction,
+tail-delay and liquidity stress outcomes. Costs are explicit; unknown economic
+outcomes and missing sessions cannot silently disappear. The current diagnostic
+does not enforce trial/holdout isolation, construct execution stresses, verify G0/G1,
+or grant promotion. A numerical pass alone does not satisfy the gate below.
 
 The primary result is a daily series of net incremental dollars at fixed capital,
 including zero-trade sessions and allocated recurring overhead. Proposed initial
