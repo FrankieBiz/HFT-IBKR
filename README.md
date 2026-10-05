@@ -204,7 +204,12 @@ downloaded. Results therefore can't be fitted after the fact.
 | RISK_REDUCING | Lower return, but lower max drawdown | Shadow it only as a risk-control overlay |
 | DOMINATED | Max drawdown not lower than buy-and-hold | Reject the rule for this period |
 
-A negative return blocks any shadow. Honest limits:
+A negative return blocks any shadow. **Realistic expectations:** the rule probably
+will *not* beat simply holding SPY. Its historical strength is smaller crashes, not
+alpha. See the [realistic odds assessment](docs/research/2026-10-05-realistic-odds.md)
+for estimated probabilities, 150 years of base rates and a daily-data whipsaw check.
+
+Honest limits:
 
 - The whole period is public history, and the 200-day rule is widely known.
 - It is one asset and one price path, with few trades.
@@ -260,6 +265,7 @@ These are offline reference tools from earlier work. Commands are in the
 
 ## Research history
 
+- [Realistic odds: will it work, make money or generate alpha?](docs/research/2026-10-05-realistic-odds.md)
 - [Blueprint review: microstructure claims, replications and test power](docs/research/2026-10-05-architecture-blueprint-review.md)
 - [HFT research decision](docs/research/2026-10-05-hft-research-decision.md) and the closed [order-flow plan](docs/plans/hft-edge-research-plan.md)
 - [Daily trend design](docs/superpowers/specs/2026-10-04-etf-trend-research-design.md) and [delivery plan](docs/plans/quant-trading-delivery-plan.md)
