@@ -124,6 +124,54 @@ class AlpacaSourceTests(unittest.TestCase):
         with self.assertRaisesRegex(InputError, 'USD domestic'):
             fetched(FakeAlpaca(dividends=foreign))
 
+    def test_issuer_pay_date_is_last_weekday_of_the_month_after_the_ex_date(self):
+        # SPDR S&P 500 ETF Trust prospectus: dividends are paid on the last Business Day of
+        # April, July, October and January; no market holiday falls on those month-ends.
+        for ex, pay in ((date(2016, 6, 17), date(2016, 7, 29)),     # month-end is a Sunday
+                        (date(2016, 12, 16), date(2017, 1, 31)),    # year rollover
+                        (date(2017, 3, 17), date(2017, 4, 28)),     # month-end is a Sunday
+                        (date(2018, 3, 16), date(2018, 4, 30)),
+                        (date(2019, 12, 20), date(2020, 1, 31)),
+                        (date(2024, 3, 15), date(2024, 4, 30))):    # matches Alpaca's own record
+            self.assertEqual(alpaca.issuer_pay_date(ex), pay)
+        with self.assertRaisesRegex(InputError, 'no issuer pay-date rule'):
+            alpaca.issuer_pay_date(date(2024, 2, 16))
+
+    def test_dividend_without_payable_date_is_derived_and_disclosed(self):
+        for omitted in ({}, {'payable_date': None}):
+            record = {'symbol': 'SPY', 'rate': Decimal('1.5949'), 'special': False, 'foreign': False,
+                      'ex_date': '2024-03-15', **omitted}
+            files = fetched(FakeAlpaca(dividends=[record]))
+            self.assertIn('2024-03-15,1.5949,2024-04-30\n', files['distributions.csv'].decode())
+            note = json.loads(files['metadata.json'])['review_note']
+            self.assertIn('omitted payable_date for 1 dividend', note)
+            self.assertIn('last weekday of the month after the ex-date', note)
+
+    def test_complete_alpaca_dividends_leave_the_metadata_note_unchanged(self):
+        note = json.loads(fetched(FakeAlpaca())['metadata.json'])['review_note']
+        self.assertNotIn('payable_date', note)
+
+    def test_derivation_is_refused_when_alpaca_dates_disagree_with_the_schedule(self):
+        provided_wrong = {'symbol': 'SPY', 'rate': Decimal('1.5'), 'special': False, 'foreign': False,
+                          'ex_date': '2024-03-15', 'payable_date': '2024-05-01'}
+        missing = {'symbol': 'SPY', 'rate': Decimal('1.5'), 'special': False, 'foreign': False,
+                   'ex_date': '2024-03-18'}
+        with self.assertRaisesRegex(InputError, 'disagree with the issuer schedule'):
+            fetched(FakeAlpaca(dividends=[provided_wrong, missing]))
+        # Without a missing date nothing is derived, so Alpaca's own date is still trusted.
+        files = fetched(FakeAlpaca(dividends=[provided_wrong]))
+        self.assertIn('2024-03-15,1.5,2024-05-01\n', files['distributions.csv'].decode())
+
+    def test_special_dividend_without_payable_date_is_never_derived(self):
+        special = {'symbol': 'SPY', 'rate': Decimal('1.5'), 'special': True, 'foreign': False,
+                   'ex_date': '2024-03-15'}
+        with self.assertRaisesRegex(InputError, 'special dividend'):
+            fetched(FakeAlpaca(dividends=[special]))
+        garbage = {'symbol': 'SPY', 'rate': Decimal('1.5'), 'special': False, 'foreign': False,
+                   'ex_date': '2024-03-15', 'payable_date': ''}
+        with self.assertRaisesRegex(InputError, 'dividend payable_date'):
+            fetched(FakeAlpaca(dividends=[garbage]))
+
     def test_daily_bars_disagreeing_with_regular_session_fail_closed(self):
         tolerated = {day: '501.00' for day in SESSIONS[:2]}  # 0.18% away on two sessions
         files = fetched(FakeAlpaca(minute_open=tolerated))

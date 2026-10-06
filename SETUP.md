@@ -186,6 +186,7 @@ cd ~/HFT-IBKR && git pull && make check
 | `market is closed now` | Normal before 09:30 or after 16:00 New York time. Nothing was recorded. |
 | `STALE_QUOTE` or `FUTURE_QUOTE` | The WSL clock drifted. In PowerShell run `wsl --shutdown`, then reopen Ubuntu. |
 | `dividend history incomplete` or `daily bars do not match the calendar` | The data failed a safety check and nothing was written. Report it. |
+| `Alpaca pay dates disagree with the issuer schedule` | The data failed a safety check and nothing was written. Report it; don't edit the data. |
 | `session decision conflict` | Today's decision is already recorded. This protection is intentional. |
 | No phone notifications | Check the channel name in the app matches `cat ~/.config/hft-ibkr/notify.env`, then run `./scripts/run_daily.sh --check`. |
 

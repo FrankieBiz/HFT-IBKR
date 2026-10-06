@@ -221,6 +221,22 @@ def _third_friday(year, month):
     return first + timedelta(days=(4 - first.weekday()) % 7 + 14)
 
 
+def issuer_pay_date(ex):
+    """SPY's pay date for a quarterly ex-date: the last weekday of the following month.
+
+    The SPDR S&P 500 ETF Trust prospectus (SEC filing dated 2019-01-17) pays dividends on
+    "the last Business Day ... of April, July, October and January". No market holiday
+    falls on the last weekday of those months, so the exact Business Day definition is moot.
+    """
+    if ex.month not in (3, 6, 9, 12):
+        raise InputError(f'{ex}: no issuer pay-date rule for an ex-date outside Mar/Jun/Sep/Dec')
+    year, month = (ex.year + 1, 1) if ex.month == 12 else (ex.year, ex.month + 1)
+    pay = date(year, month + 1, 1) - timedelta(days=1)
+    while pay.weekday() > 4:
+        pay -= timedelta(days=1)
+    return pay
+
+
 def build_inputs(bars, dividends, calendar, *, start, end, retrieved, check=None):
     """Validate fetched records and render the declared intake files as bytes."""
     sessions = _calendar_sessions(calendar, start, end)
@@ -243,6 +259,7 @@ def build_inputs(bars, dividends, calendar, *, start, end, retrieved, check=None
 
     first, last = days[0], days[-1]
     distributions = {}
+    derived, provided = [], []
     for item in dividends:
         if not isinstance(item, dict):
             raise InputError('dividend: object required')
@@ -251,10 +268,31 @@ def build_inputs(bars, dividends, calendar, *, start, end, retrieved, check=None
             continue
         if item.get('foreign') or item.get('currency', 'USD') != 'USD':
             raise InputError(f'{ex}: only USD domestic cash dividends are supported')
-        pay = iso_date(item.get('payable_date'), 'dividend payable_date')
+        if item.get('payable_date') is None:  # Alpaca omits it on older records
+            if item.get('special'):
+                raise InputError(f'{ex}: cannot derive a pay date for a special dividend')
+            pay = issuer_pay_date(ex)
+            derived.append(ex)
+        else:
+            pay = iso_date(item.get('payable_date'), 'dividend payable_date')
+            provided.append((ex, pay))
         if ex in distributions:
             raise InputError(f'{ex}: multiple cash dividends share an ex-date')
         distributions[ex] = (_decimal(item.get('rate'), 'dividend rate'), pay)
+    pay_note = ''
+    if derived:
+        # Alpaca's own dates are the only independent check on the derived ones.
+        checkable = [(ex, pay) for ex, pay in provided if ex.month in (3, 6, 9, 12)]
+        disagree = [ex.isoformat() for ex, pay in checkable if pay != issuer_pay_date(ex)]
+        if disagree:
+            raise InputError(f'Alpaca pay dates disagree with the issuer schedule on {disagree[:3]}; '
+                             'refusing to derive the missing ones')
+        pay_note = (f' Alpaca omitted payable_date for {len(derived)} dividend(s) with ex-dates '
+                    f'{min(derived).isoformat()} to {max(derived).isoformat()}; these were derived as the '
+                    'last weekday of the month after the ex-date, per the SPDR S&P 500 ETF Trust prospectus '
+                    '(SEC filing dated 2019-01-17); '
+                    + (f'they matched all {len(checkable)} Alpaca-provided pay dates that could be checked.'
+                       if checkable else 'no Alpaca-provided pay date was available to cross-check them.'))
     # SPY goes ex-dividend on the third Friday of each quarter-end month.
     missing = [f'{year}-{month:02d}' for year in range(first.year, last.year + 1) for month in (3, 6, 9, 12)
                if first < _third_friday(year, month) <= last
@@ -285,7 +323,7 @@ def build_inputs(bars, dividends, calendar, *, start, end, retrieved, check=None
                         'Quarterly dividend coverage and bar/calendar equality were checked; a '
                         'daily-versus-regular-session minute-bar cross-check is in alpaca-check.json. '
                         'No split is declared because SPY has not split, per public split histories; '
-                        'not independently verified against exchange official records.'),
+                        'not independently verified against exchange official records.' + pay_note),
         'sources': {
             'prices': {'name': 'Alpaca Market Data API v2 daily bars',
                        'reference': f'{DATA_URL}/v2/stocks/bars symbols=SPY timeframe=1Day adjustment=raw feed=sip; {window}',

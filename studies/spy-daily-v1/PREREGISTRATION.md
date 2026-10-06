@@ -34,6 +34,24 @@ Why this study, and not intraday: see the
 - **Storage:** inputs and bundle stay under the gitignored `.research-output/`.
   Alpaca's terms allow personal non-commercial use and forbid redistribution.
 
+### Intake amendment, 2026-10-05 (before any analysis)
+
+The first retrieval attempt stopped fail-closed at intake: Alpaca's cash-dividend
+records for SPY ex-dates from 2016-06-17 to 2019-12-20 have no `payable_date`. No
+bundle, validation run or holdout run was produced, and no price data was inspected.
+`protocol.json` and `config.json` are unchanged.
+
+The intake now derives a missing pay date as **the last weekday of the month after the
+ex-date**. Source: the SPDR S&P 500 ETF Trust prospectus (SEC filing dated 2019-01-17),
+"Payments of dividends are made quarterly, on the last Business Day ... of April, July,
+October and January"; the ex-date is the third Friday of March, June, September and
+December. The last weekday of those four months is never a market holiday, so the exact
+Business Day definition does not matter. The rule is applied only to records that lack
+a date, never to a special dividend, and it is cross-checked against every
+Alpaca-provided pay date: any disagreement stops the intake. The derivation and the
+number of dates checked are recorded in the bundle's `review_note`. The pay date only
+sets when a dividend's cash reaches the portfolio, about one month after the ex-date.
+
 ## Protocol
 
 | Field | Value |
