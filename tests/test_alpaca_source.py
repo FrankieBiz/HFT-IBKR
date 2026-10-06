@@ -2,7 +2,7 @@ import io
 import json
 import re
 import ssl
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 import tempfile
@@ -97,6 +97,86 @@ class AlpacaSourceTests(unittest.TestCase):
         daily = next(url for url in fake.urls if 'timeframe=1Day' in url)
         for part in ('adjustment=raw', 'feed=iex', 'start=2024-03-11', 'end=2024-03-23'):
             self.assertIn(part, daily)
+
+    def test_previous_session_sip_request_uses_explicit_historical_bounds(self):
+        fake = FakeAlpaca(page_size=3)
+        now = datetime(2024, 3, 23, 0, 10, tzinfo=timezone.utc)
+
+        def delayed_sip(url):
+            query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
+            if '/stocks/bars?' in url:
+                # Date-only bounds are ambiguous at the provider boundary. Require
+                # RFC3339 for every page and every minute sample, outside SIP delay.
+                self.assertIn('T', query['start'])
+                self.assertIn('T', query['end'])
+                self.assertTrue(query['start'].endswith('Z'))
+                self.assertTrue(query['end'].endswith('Z'))
+                end_at = datetime.fromisoformat(query['end'].replace('Z', '+00:00'))
+                if end_at > now - timedelta(minutes=15):
+                    raise InputError('Alpaca HTTP 403: subscription does not permit querying recent SIP data')
+            return fake(url)
+
+        files = alpaca.fetch_inputs(delayed_sip, START, END, clock=lambda: now, feed='sip')
+        self.assertIn('2024-03-22,', files['prices.csv'].decode())
+        self.assertEqual(json.loads(files['alpaca-check.json'])['feed'], 'sip')
+        queries = [dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
+                   for url in fake.urls if 'timeframe=1Day' in url]
+        self.assertEqual(queries[0]['start'], '2024-03-11T04:00:00Z')
+        self.assertEqual(queries[0]['end'], '2024-03-22T23:54:00Z')
+        self.assertEqual({q['end'] for q in queries}, {'2024-03-22T23:54:00Z'})
+
+    def test_daily_end_excludes_next_session_bar_in_summer_and_winter(self):
+        for end, now, expected in (
+                (date(2024, 3, 22), CLOCK(), '2024-03-23T03:59:59.999999Z'),
+                (date(2024, 1, 3), CLOCK(), '2024-01-04T04:59:59.999999Z')):
+            fake = FakeAlpaca()
+            if end.month == 1:
+                day = end.isoformat()
+                fake.daily = [dict(daily_bar(day), t=day+'T05:00:00Z')]
+                def get(url):
+                    query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
+                    if '/calendar?' in url:
+                        return json.dumps([{'date': day, 'open': '09:30', 'close': '16:00'}]).encode()
+                    if query.get('timeframe') == '1Min':
+                        return json.dumps({'bars': {'SPY': [{'t': day+'T14:30:00Z',
+                            'o': 500.10, 'h': 505.5, 'l': 499, 'c': 501, 'v': 1000}]}}).encode()
+                    return fake(url)
+                start = date(2024, 1, 2)
+            else:
+                get, start = fake, START
+            with self.subTest(end=end):
+                alpaca.fetch_inputs(get, start, end, clock=lambda: now, feed='sip')
+                daily = next(url for url in fake.urls if 'timeframe=1Day' in url)
+                query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(daily).query))
+                self.assertEqual(query['end'], expected)
+
+    def test_incomplete_session_fails_before_bar_request(self):
+        fake = FakeAlpaca()
+        with self.assertRaisesRegex(InputError, 'completed|available'):
+            alpaca.fetch_inputs(fake, START, END,
+                clock=lambda: datetime(2024, 3, 22, 19, 39, tzinfo=timezone.utc), feed='sip')
+        self.assertFalse(any('/stocks/bars?' in url for url in fake.urls))
+
+    def test_bar_errors_identify_safe_query_bounds_without_keys_or_page_token(self):
+        url = ('https://data.alpaca.markets/v2/stocks/bars?feed=sip&timeframe=1Day'
+               '&start=2016-01-01T05%3A00%3A00Z&end=2026-10-06T03%3A59%3A59.999999Z'
+               '&page_token=private-token&APCA_API_SECRET_KEY=secret-query')
+        denied = urllib.error.HTTPError(url, 403, 'forbidden', {},
+            io.BytesIO(b'{"message":"subscription does not permit querying recent SIP data"}'))
+
+        class Denied:
+            def open(self, request, timeout):
+                raise denied
+
+        with patch.object(alpaca, '_opener', return_value=Denied()), self.assertRaises(InputError) as raised:
+            alpaca.environment_transport(environ={'APCA_API_KEY_ID': 'fake-id',
+                'APCA_API_SECRET_KEY': 'fake-secret'})(url)
+        message = str(raised.exception)
+        for value in ('feed=sip', 'timeframe=1Day', 'start=2016-01-01T05:00:00Z',
+                      'end=2026-10-06T03:59:59.999999Z'):
+            self.assertIn(value, message)
+        for private in ('private-token', 'secret-query', 'fake-id', 'fake-secret', 'page_token', 'APCA_API_SECRET_KEY'):
+            self.assertNotIn(private, message)
 
     def test_default_intake_works_when_subscription_denies_sip(self):
         fake = FakeAlpaca(page_size=3)

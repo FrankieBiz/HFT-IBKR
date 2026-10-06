@@ -104,6 +104,14 @@ registry; a failed fetch publishes no intake directory. Never relabel previously
 downloaded SIP data as IEX or delete released study history to rerun a holdout.
 An existing qualified SIP study continues to request SIP; a new feed requires
 reviewed evidence rather than relabeling or resetting consumed holdouts.
+If the completed study passes readiness but the daily runner reports **recent SIP
+data** HTTP 403, stop the runner with Ctrl-C, update the branch and restart it.
+The corrected daily intake uses explicit UTC bounds, excludes the following
+session, and caps requests at least 16 minutes before its clock. It requires the
+final requested session to have closed before that cutoff. **Do not rerun the
+completed study or remove its registry for this repair.** Errors now show only
+safe feed/timeframe/date bounds alongside the endpoint; keys and page tokens are
+excluded from request context.
 For a separately authorized standalone SIP download, `quant_data fetch-alpaca`
 accepts `--feed sip`; it never falls back to another feed after an access failure.
 

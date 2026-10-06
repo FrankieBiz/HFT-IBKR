@@ -43,3 +43,35 @@ passed after the fix. Independent review resolved feed-switching and synthetic-d
 acceptance issues and found no remaining blockers in scope. `make check build demo`
 exited 0 with 273 tests, compilation, diff checking and the synthetic demo passing.
 No authenticated provider request was made; the operator must retry their download.
+
+## Follow-up: qualified SIP daily download
+
+The operator then supplied a daily-run failure at 2026-10-06 15:39 EDT after
+historical readiness passed. Preserving the qualified SIP feed was correct, but
+the daily intake still advanced a date-only end into the current date. The previous
+default-feed repair did not address that request boundary. The provider's exact
+interpretation was not tested with credentials; eliminating date-only ambiguity
+and enforcing the documented historical delay is the bounded repair.
+
+Reviewed the [historical bars reference](https://docs.alpaca.markets/us/reference/stockbars)
+and [Market Data FAQ](https://docs.alpaca.markets/us/docs/market-data-faq) on
+2026-10-06: RFC3339 boundaries are supported, the end is inclusive, and unsubscribed
+historical SIP requires an end at least 15 minutes old.
+
+Intake now sends explicit UTC timestamps from New York dates, ending just before
+the following session's midnight label or 16 minutes before the captured clock,
+whichever is earlier. It requires the final requested calendar close to be no
+later than that bound before requesting any bars. This retains completed daily
+bars and keeps all sampled minute closes and paginated daily requests outside the
+recent-data window. Existing qualified feed, study records and ledger are preserved.
+HTTP errors expose validated feed/timeframe/date context while excluding keys,
+opaque page tokens and arbitrary query fields.
+
+Regressions failed before the repair and passed afterward for explicit delayed SIP
+bounds, pagination, summer/winter label exclusion, incomplete-session rejection,
+and redacted query diagnostics. Validation is offline; actual API recovery requires
+the operator's rerun, not re-release or deletion of completed study evidence.
+
+Follow-up verification: `make check build demo` exited 0 with 277 tests, compilation,
+diff checks and the synthetic demo passing. Independent request-bound and secret-
+redaction reviews found no remaining blockers within scope.

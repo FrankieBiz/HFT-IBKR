@@ -11,12 +11,13 @@ import csv
 import io
 import json
 import os
+import re
 import ssl
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time as day_time, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -36,6 +37,7 @@ CHECK_SESSIONS = 10
 # Tolerance and count for the daily-versus-regular-session cross-check, fixed in advance.
 CHECK_TOLERANCE = Decimal('0.001')
 CHECK_MAX_FLAGGED = 2
+HISTORICAL_DELAY = timedelta(minutes=16)  # Basic SIP excludes the latest 15 minutes.
 FEEDS = {'iex': 'IEX single-exchange', 'sip': 'SIP consolidated'}
 FILES = ('prices.csv', 'distributions.csv', 'calendar.csv', 'metadata.json', 'alpaca-check.json')
 SYSTEM_CA_BUNDLE = '/etc/ssl/cert.pem'
@@ -101,7 +103,23 @@ def environment_transport(*, attempts=5, pause=time.sleep, environ=None):
 
 def _redacted(url):
     parts = urllib.parse.urlsplit(url)
-    return f'{parts.scheme}://{parts.netloc}{parts.path}'
+    query = urllib.parse.parse_qs(parts.query)
+    context = []
+    # Only these validated public query fields are useful for debugging access.
+    # Credentials, opaque tokens and arbitrary query text remain excluded.
+    for key in ('feed', 'timeframe', 'start', 'end'):
+        values = query.get(key, [])
+        if len(values) != 1:
+            continue
+        value = values[0]
+        permitted = (value in FEEDS if key == 'feed' else
+                     value in ('1Day', '1Min') if key == 'timeframe' else
+                     re.fullmatch(r'\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}'
+                                  r'(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2}))?', value))
+        if permitted:
+            context.append(f'{key}={value}')
+    suffix = ' [' + ' '.join(context) + ']' if context else ''
+    return f'{parts.scheme}://{parts.netloc}{parts.path}' + suffix
 
 
 def _get_json(get, base, path, params):
@@ -431,18 +449,33 @@ def fetch_inputs(get, start, end, *, clock=None, feed='iex'):
     clock = clock or (lambda: datetime.now(timezone.utc))
     if not isinstance(start, date) or not isinstance(end, date) or start >= end:
         raise InputError('start must precede end')
+    now = clock()
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise InputError('intake clock must be timezone-aware')
+    # Date-only end bounds can include the current date. Use explicit instants,
+    # exclude the next session's midnight label, and stay outside Basic's SIP delay.
+    first_at = datetime.combine(start, day_time(), NEW_YORK).astimezone(timezone.utc)
+    last_at = datetime.combine(end + timedelta(days=1), day_time(), NEW_YORK).astimezone(timezone.utc)
+    last_at = min(last_at - timedelta(microseconds=1), now.astimezone(timezone.utc) - HISTORICAL_DELAY)
+    if last_at <= first_at:
+        raise InputError('no completed historical interval available before the data-delay cutoff')
+    request_start, request_end = (instant.isoformat().replace('+00:00', 'Z') for instant in (first_at, last_at))
     stamp = lambda: clock().replace(microsecond=0).isoformat().replace('+00:00', 'Z')
     retrieved = {}
     calendar = fetch_calendar(get, start.isoformat(), end.isoformat())
     retrieved['calendar'] = stamp()
-    # A bare end date may mean midnight UTC, before the final bar's 04:00Z/05:00Z label;
-    # request one extra day and filter by session date instead.
-    bars = fetch_bars(get, 'SPY', start.isoformat(), (end + timedelta(days=1)).isoformat(), feed=feed)
+    final_day, _, final_close = _calendar_sessions(calendar, start, end)[-1]
+    close_at = datetime.fromisoformat(f'{final_day}T{final_close}:00').replace(tzinfo=NEW_YORK)
+    if close_at.astimezone(timezone.utc) > last_at:
+        raise InputError('final session is not completed and available before the data-delay cutoff')
+    bars = fetch_bars(get, 'SPY', request_start, request_end, feed=feed)
     retrieved['prices'] = stamp()
     dividends = fetch_dividends(get, 'SPY', (start - timedelta(days=31)).isoformat(),
                                 (end + timedelta(days=31)).isoformat())
     retrieved['distributions'] = stamp()
     check = cross_check(get, bars, calendar, start=start, end=end, feed=feed)
+    check['daily_request_window'] = {'start': request_start, 'end': request_end,
+                                    'minimum_age_seconds': int(HISTORICAL_DELAY.total_seconds())}
     return build_inputs(bars, dividends, calendar, start=start, end=end, retrieved=retrieved,
                         check=check, feed=feed)
 

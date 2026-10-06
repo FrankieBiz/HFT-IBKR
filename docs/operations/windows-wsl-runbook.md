@@ -29,6 +29,14 @@ Operational history retains the feed declared in the authenticated study bundle.
 Existing SIP studies continue to fetch SIP; cached and newly prepared daily bundles
 are checked for feed equality before decisions. Unknown/ambiguous feeds block.
 
+For a recent-SIP 403 after historical readiness passed, update and restart the
+runner without rerunning the completed study. Intake uses explicit UTC timestamps
+from New York session dates, excludes the next session's midnight label and caps
+the end at least 16 minutes behind the captured clock. It checks the final calendar
+close before requesting bars; incomplete/unavailable sessions fail rather than
+publishing partial daily data. Pagination retains the same bound. Error context
+includes only validated feed/timeframe/date fields, excluding keys and page tokens.
+
 ## Study before operations
 
 The current protocol is [spy-trend-v2](../../studies/spy-trend-v2/PROTOCOL.md), not
