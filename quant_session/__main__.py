@@ -6,6 +6,7 @@ and SPY's free real-time IEX quote to render plan inputs.
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import json
 from pathlib import Path
 import sys
 
@@ -17,7 +18,6 @@ from quant_research.serde import InputError, canonical_json
 from .inputs import parse_schedule, parse_snapshot, read_document
 from .ledger import DecisionLedger
 from .live import build_schedule, build_snapshot, latest_quote, market_clock
-from .planner import plan_session
 
 
 def _now():
@@ -85,11 +85,10 @@ def main(argv=None):
             hashes[field] = hashlib.sha256(content).hexdigest()
         for package in ('quant_session','quant_research','quant_data'):
             hashes[package+'_source'] = source_identity(package=package)['source_sha256']
-        report = plan_session(dataset,parse_config(declarations['config']),
+        content = DecisionLedger(args.ledger).plan(dataset,parse_config(declarations['config']),
                               parse_schedule(declarations['schedule']),
                               parse_snapshot(declarations['snapshot']),hashes)
-        input_id = hashlib.sha256(canonical_json(report['source_hashes']).encode()).hexdigest()
-        content = DecisionLedger(args.ledger).record(report,input_id)
+        report = json.loads(content)
         publish_report(args.output,content.decode('utf-8'))
         print(f"{report['status']}: {report['decision_id']}")
         return 0

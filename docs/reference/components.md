@@ -148,8 +148,9 @@ input/config/protocol/source hashes, and an append-only registry. A holdout iden
 can be released once through that registry; interrupted releases remain consumed.
 The registry also claims every revealed holdout session per data kind and symbol, so
 renaming a protocol, editing code or shifting the window cannot re-release a session.
-Registries created before 2026-10-05 lack those session claims for earlier releases;
-start a fresh registry for a new study.
+Registries created before 2026-10-05 may lack session claims for earlier releases;
+retain them for reviewed migration. Starting a new registry must not reopen
+previously revealed final history.
 Both reports include same-date buy-and-hold and zero-interest cash benchmarks under
 the declared cost scenarios. Completed reports remain recoverable without rerunning:
 
@@ -161,6 +162,57 @@ python3 -m quant_research recover \
 
 The registry guards local workflow mistakes. Copying datasets or deleting the
 registry can bypass that guard; it is not access control over market data.
+
+## Current overlay readiness and diagnostics
+
+The [current protocol](../../studies/spy-trend-v2/PROTOCOL.md) keeps v1 unchanged
+and shares its registry. Operator scripts authenticate historical evidence before
+external setup; synthetic CLI rehearsals remain independent. A readiness check
+is entirely offline:
+
+```sh
+python3 -m quant_session.readiness \
+  --bundle .research-output/spy-trend-v2/spy.qdata \
+  --config studies/spy-trend-v2/config.json \
+  --protocol studies/spy-trend-v2/protocol.json \
+  --selection .research-output/spy-trend-v2/selection.json \
+  --holdout .research-output/spy-trend-v2/holdout.json \
+  --registry .research-output/spy-daily-v1/experiments.sqlite
+```
+
+`--planning-config PATH` must match the selected-lookback substitution exactly;
+`--config-out NEW_PATH` publishes that verified config. Exit 2 blocks missing,
+rejected, synthetic or changed-code evidence. No registry/data is initialized here.
+
+Robustness diagnostics use development/validation history only:
+
+```sh
+python3 -m quant_research robustness \
+  --bundle .research-output/spy-trend-v2/spy.qdata \
+  --config studies/spy-trend-v2/config.json \
+  --protocol studies/spy-trend-v2/protocol.json \
+  --output .research-output/spy-trend-v2/robustness.json
+```
+
+Options are `--train-sessions` (252), `--test-sessions` (63),
+`--embargo-sessions` (protocol default, cannot be weakened), `--folds` (all available
+complete folds), `--block-size` (20), `--samples` (500) and `--seed` (0).
+Reports freeze boundaries/settings and cost scenarios. Paired blocks share sampled
+indices and do not cross reset boundaries. Closing-return resampling is conditional
+path stress, not a future-success probability, rerun of risk controls or selector
+for the final study. Complete input hashes still cover excluded holdout bytes.
+The portable form is `python3 dist/quant-system.pyz research robustness ...`.
+
+For independent offline runner health use:
+
+```sh
+python3 scripts/check_shadow_health.py \
+  --heartbeat .research-output/shadow/heartbeat.json \
+  --ledger .research-output/shadow/ledger.sqlite
+```
+
+This checker must be scheduled independently to detect a dead process. It does not
+contact services or install a watchdog. See the [operator runbook](../operations/windows-wsl-runbook.md).
 
 ## Order controls and recovery
 

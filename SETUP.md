@@ -1,198 +1,163 @@
 # Setup guide
 
-This guide takes a Windows PC with WSL (Ubuntu) from nothing to a system that runs on
-its own each trading day and reports to your phone. Every command runs in the
-**Ubuntu (WSL) terminal**. After each step there is a ✅ check, so you know it worked
-before moving on.
+The current project is a bounded daily SPY research/shadow overlay. It never sends
+orders. Set it up locally first; daily operator scripts require approved historical
+evidence that matches the revised settings. [README](README.md) explains the policy.
 
-> **What you're setting up:** once per trading day, one minute after the 09:30 New
-> York open, the system decides whether a shadow portfolio should hold SPY or cash. It
-> records the decision and pushes it to your phone. **It never places orders.**
-> [README](README.md) explains how it decides; the
-> [WSL runbook](docs/operations/windows-wsl-runbook.md) has extra detail.
+## 1. Install and verify offline
 
-**You need:**
+Use Python 3.11+ on macOS, Linux or Windows with WSL/Ubuntu. On WSL keep the checkout
+in the Linux home directory rather than `/mnt/c`.
 
-- Windows 10 or 11 with WSL and Ubuntu installed.
-- An internet connection.
-- About 30 minutes.
-- A phone, for notifications (optional).
+If WSL is not installed, run this in **PowerShell as Administrator**, restart if
+prompted, then open Ubuntu and complete its username/password setup:
 
-The IB Gateway is **not** needed.
+```powershell
+wsl --install -d Ubuntu-24.04
+```
 
----
+In Ubuntu:
 
-## 1. Install the basics
-
-```bash
+```sh
 sudo apt update
-sudo apt install -y git make python3 python3-venv tzdata ca-certificates curl unzip
+sudo apt install -y git make python3 tzdata ca-certificates curl nano
 python3 --version
 ```
 
-✅ Python must print **3.11 or higher**. If it shows 3.10 (Ubuntu 22.04):
+For a new installation, clone the published revision:
 
-```bash
-sudo apt install -y python3.11 python3.11-venv
+```sh
+git clone --branch FrankieBiz/compare-built-system-to https://github.com/FrankieBiz/HFT-IBKR.git ~/HFT-IBKR
+cd ~/HFT-IBKR
 ```
 
-Then add `PYTHON=python3.11` in front of every `make` and `./scripts/...` command
-below. For example: `PYTHON=python3.11 make check build demo`.
+If you already have this repository on the computer, update that checkout instead.
+Retain `.research-output/`, including study registries and shadow ledgers; do not
+replace it with an empty folder to bypass previously consumed holdouts or halts.
+Commit or otherwise preserve local source edits before switching branches:
 
-## 2. Download the code and test it
+```sh
+cd ~/HFT-IBKR
+git fetch origin
+git switch FrankieBiz/compare-built-system-to
+git pull --ff-only origin FrankieBiz/compare-built-system-to
+```
 
-Keep it in your Linux home folder (`~`), **not** under `/mnt/c`.
+Then verify the checkout:
 
-```bash
-cd ~
-git clone -b FrankieBiz/feat-hft-research-review https://github.com/FrankieBiz/HFT-IBKR.git
-cd HFT-IBKR
+```sh
 make check build demo
 ```
 
-✅ Working if the test summary ends in **`OK`** and the final block shows
-**`"status": "offline_workflows_passed"`**.
+Tests should finish with `OK`; the synthetic demo should report
+`offline_workflows_passed`. No data keys, broker login or network access are needed
+for these checks. The portable application is `dist/quant-system.pyz`.
 
-> Once pull request #2 is merged you can use `main` instead:
-> `git checkout main && git pull`.
+## 2. Understand the study gate
 
-## 3. Get free market-data keys (Alpaca)
+The default is [spy-trend-v2](studies/spy-trend-v2/PROTOCOL.md): a 25% entry target,
+30% entry exposure cap and 10% persistent drawdown halt on new buys. The original
+study is retained, but its different settings cannot qualify this version.
 
-1. Sign up at **https://alpaca.markets**. Email only: no card, no deposit.
-2. In the dashboard choose **Paper Trading**, then **API Keys → Generate**. Copy both keys.
-3. Save them in a private file:
+The study shares `.research-output/spy-daily-v1/experiments.sqlite`. If v1 already
+released the final sessions, v2 cannot release them again. Stop and define a study
+on fresh future dates; retain the registry and old reports. Missing, rejected or
+changed-code evidence also blocks the daily workflow. This is intentional.
 
-```bash
-mkdir -p ~/.config/alpaca && chmod 700 ~/.config/alpaca
+## 3. Configure data access only when you choose to run a study
+
+The existing intake uses Alpaca bars, dividends and calendar, with an IEX quote for
+shadow pricing. Review current provider terms and your entitlement before use.
+Save your own paper-data keys in `~/.config/alpaca/paper.env`, outside the repo:
+
+```sh
+mkdir -p ~/.config/alpaca
+chmod 700 ~/.config/alpaca
+touch ~/.config/alpaca/paper.env
+chmod 600 ~/.config/alpaca/paper.env
 nano ~/.config/alpaca/paper.env
 ```
-
-Type these two lines with your real keys:
 
 ```text
 APCA_API_KEY_ID=your-key-id
 APCA_API_SECRET_KEY=your-secret
 ```
 
-Save with **Ctrl-O**, **Enter**, **Ctrl-X**, then lock the file:
+In nano, save with Ctrl-O, Enter and exit with Ctrl-X. Never paste keys into chats,
+commits or command lines. No IB Gateway is needed for this workflow.
 
-```bash
-chmod 600 ~/.config/alpaca/paper.env
-```
+Run the explicit study command when you authorize fetching its inputs:
 
-> Never paste the keys into chats, commits or commands. The tools read them from this
-> file and never print them.
-
-## 4. Set up phone notifications (ntfy)
-
-```bash
-mkdir -p ~/.config/hft-ibkr && chmod 700 ~/.config/hft-ibkr
-echo "NTFY_TOPIC=hft-ibkr-$(python3 -c 'import secrets; print(secrets.token_urlsafe(12))')" > ~/.config/hft-ibkr/notify.env
-chmod 600 ~/.config/hft-ibkr/notify.env
-cat ~/.config/hft-ibkr/notify.env
-```
-
-The last line prints your private channel name, something like
-`hft-ibkr-Xy3...`. Anyone who knows it can read your status messages, so keep it to
-yourself. Messages contain only status, never keys or account details.
-
-- **Phone:** install the free **ntfy** app (App Store or Google Play), tap **+**, and
-  subscribe to your channel name on server `ntfy.sh`.
-- **Mac or any browser:** open `https://ntfy.sh/` followed by your channel name.
-
-## 5. Create your shadow portfolio
-
-```bash
-mkdir -p .research-output/shadow
-cp examples/shadow/portfolio.template.json .research-output/shadow/portfolio.json
-nano .research-output/shadow/portfolio.json
-```
-
-Set `cash`, `settled_cash` and `peak_nav` to the amount you'd dedicate to the strategy
-(default `50000`). Leave `shares` at `0` and `halted` at `false`, then save.
-
-> Nothing updates this file for you. If you want the shadow to follow a BUY or SELL,
-> edit the shares and cash yourself afterwards. Setting `"halted": true` blocks all
-> decisions.
-
-## 6. Check everything works (do this the night before)
-
-```bash
-./scripts/run_daily.sh --check
-```
-
-✅ Your phone or browser shows **"Setup check passed"**. If you see `FAILED`, the keys
-or network are wrong; see [Troubleshooting](#troubleshooting).
-
-```bash
+```sh
 ./scripts/run_study.sh
 ```
 
-✅ It takes about a minute and finishes with `"outcome": ...`, the verdict of the
-one-time pre-registered study. The study can only be released once, so a second run
-just reprints the verdict.
+It preserves finished steps, records diagnostics and applies the mechanical verdict.
+A successful command alone does not mean the verdict permits shadowing. The daily
+runner independently authenticates the records and enforces that verdict.
 
-## 7. Keep the PC awake
+## 4. Prepare the manual shadow book
 
-In Windows, open **Settings → System → Power → Screen and sleep**. Set "When plugged
-in, put my device to sleep after" to **Never**. Keep the PC plugged in and online.
-
-## 8. Start it each morning
-
-```bash
-cd ~/HFT-IBKR && ./scripts/run_daily.sh
+```sh
+mkdir -p .research-output/shadow
+test -f .research-output/shadow/portfolio.json || cp examples/shadow/portfolio.template.json .research-output/shadow/portfolio.json
+nano .research-output/shadow/portfolio.json
 ```
 
-Then **minimize** the Ubuntu window. **Don't close it**: closing it stops the system.
-You can start it any time before the open, for example 6:30 am. It waits on its own
-and keeps running day after day until you press **Ctrl-C**.
+Set `cash`, `settled_cash` and `peak_nav` to your **modeled strategy account** value;
+leave `shares` at zero initially. The example capital is not an allocation
+recommendation. After a modeled fill, edit shares and cash yourself. No broker
+position is read and nothing updates this book automatically. Do not mix deposits,
+withdrawals or other assets into an ongoing ledger without an accounting review.
 
-## 9. Check on it from anywhere
+Setting `halted` to true blocks all proposals. Drawdown memory is held in the ledger
+and cannot be cleared by lowering this file's peak or restarting. Preserve legacy
+ledgers; those without risk memory require reviewed migration, not deletion.
 
-On your phone or at `https://ntfy.sh/<your channel name>` you'll see:
+## 5. Start only after readiness passes
 
-| Notification | When |
-| --- | --- |
-| **HFT-IBKR started** | As soon as you start it |
-| **Study verdict** | First run only, if step 6 was skipped |
-| **Waiting for the open** | Right away; shows the minutes until 09:31 New York time |
-| **Today's decision** | A little after 09:31 New York time: `BUY` / `SELL` / `HOLD` / `BLOCKED` |
-| **Market closed today** | On market holidays |
-| **… FAILED** | If something breaks; includes the error. It keeps running. |
-
-No message by about **09:40 New York time** means the PC slept, lost internet or the
-window was closed. Back home, the full history is here:
-
-```bash
-cat ~/HFT-IBKR/.research-output/shadow/run.log
+```sh
+./scripts/run_daily.sh --check
+./scripts/run_daily.sh
 ```
 
-## Updating later
+Both commands fail before external calls if study evidence is absent or rejected.
+The runner does not create a study for you. Keep the computer awake and the terminal
+open. It waits for the calendar's open and records one decision at about 09:31 New
+York. Stop with Ctrl-C. `--once` handles the current day only.
 
-```bash
-cd ~/HFT-IBKR && git pull && make check
+Optional phone notifications use operator-configured `NTFY_TOPIC` in
+`~/.config/hft-ibkr/notify.env`. Review the provider before enabling it. Status also
+goes to `.research-output/shadow/run.log`; a channel name should stay private.
+
+## 6. Check health independently
+
+From a separate terminal or scheduler:
+
+```sh
+python3 scripts/check_shadow_health.py \
+  --heartbeat .research-output/shadow/heartbeat.json \
+  --ledger .research-output/shadow/ledger.sqlite
 ```
 
----
+The checker is offline. Exit 0 means the declared health checks pass; exit 2 means
+missing/stale/future/failed state or a missed decision deadline. The runner records
+its expected daily deadline. You can also supply `--session YYYY-MM-DD --deadline
+UTC_TIMESTAMP` to the checker explicitly. A stopped runner cannot send an alert
+about its own death: use an independent scheduler and alert path if you need that.
+No scheduler or monitoring service is installed by this project.
 
 ## Troubleshooting
 
-| You see | Do this |
+| Result | Action |
 | --- | --- |
-| `set APCA_API_KEY_ID and APCA_API_SECRET_KEY` or `HTTP 401` | The keys are missing or wrong. Re-check `~/.config/alpaca/paper.env` (step 3). |
-| `HTTP 403 ... SIP` | Alpaca's free plan refused the historical data. Stop and report it; don't switch data feeds. |
-| `CERTIFICATE_VERIFY_FAILED` | `sudo apt install --reinstall ca-certificates` |
-| `ZoneInfoNotFoundError` | `sudo apt install tzdata` |
-| `market is closed now` | Normal before 09:30 or after 16:00 New York time. Nothing was recorded. |
-| `STALE_QUOTE` or `FUTURE_QUOTE` | The WSL clock drifted. In PowerShell run `wsl --shutdown`, then reopen Ubuntu. |
-| `dividend history incomplete` or `daily bars do not match the calendar` | The data failed a safety check and nothing was written. Report it. |
-| `Alpaca pay dates disagree with the issuer schedule` | The data failed a safety check and nothing was written. Report it; don't edit the data. |
-| `session decision conflict` | Today's decision is already recorded. This protection is intentional. |
-| No phone notifications | Check the channel name in the app matches `cat ~/.config/hft-ibkr/notify.env`, then run `./scripts/run_daily.sh --check`. |
+| Readiness/evidence failure | Preserve artifacts; check protocol, source identity, registry and verdict. Do not bypass it with a custom config. |
+| Holdout already released | Preserve registry; use a separately frozen protocol on fresh future dates. |
+| Legacy ledger | Retain history for reviewed migration; do not reset it to erase a halt. |
+| Corrupt/conflicting decision | Stop; preserve the ledger and inputs for investigation. |
+| Stale/future quote | Check clock/network; invalid marks do not update risk memory. |
+| Intake/calendar/dividend failure | Stop and review data quality; do not edit data to force acceptance. |
+| Stale heartbeat/missing decision | Check whether the PC slept, runner stopped or inputs failed. |
 
-## Before you leave home: checklist
-
-- [ ] `./scripts/run_daily.sh --check` reached your phone
-- [ ] Windows sleep is set to **Never**, and the PC is plugged in
-- [ ] `./scripts/run_daily.sh` is running in a minimized Ubuntu window
-- [ ] You received **HFT-IBKR started** and **Waiting for the open**
+See the [component reference](docs/reference/components.md) for offline commands and
+[Windows/WSL runbook](docs/operations/windows-wsl-runbook.md) for operator details.
