@@ -5,10 +5,81 @@ historical readiness, persistent entry halts and independently checkable health.
 [SETUP.md](../../SETUP.md) is the short guide; [README](../../README.md) explains the
 strategy and limitations. This workflow never sends broker orders.
 
+## Update and open the app
+
+For your existing `~/HFT-IBKR` checkout, stop any terminal runner with Ctrl-C and
+run these commands in Ubuntu:
+
+```sh
+cd ~/HFT-IBKR
+git pull --ff-only origin FrankieBiz/compare-built-system-to
+./scripts/run_app.sh
+```
+
+The launcher opens the Windows browser through `cmd.exe` at
+**http://localhost:8765**; enter the address yourself if it does not open. The
+backend binds only to `127.0.0.1`. For subsequent starts, optionally copy
+`Start-Trading-App.cmd` to the Windows desktop. It runs the checkout in the default
+WSL distribution at `~/HFT-IBKR`; it does not install WSL, Python or the repository.
+
+Keep the app's launch window open. Ctrl-C stops its backend and owned jobs;
+closing the browser leaves them running. Overview's **Start runner** and **Stop**
+control app-owned jobs. A runner already owned by a separate Ubuntu terminal is
+shown as external; stop it with Ctrl-C in that terminal. The shared ownership lock
+prevents duplicate app/terminal runners. Opening the app starts no jobs or downloads.
+
+Keep existing keys, completed study evidence, `.research-output/`, the shared
+registry, portfolio and ledgers. Updating or opening the app never requires
+rerunning a completed study. The recent-SIP request-window correction below still
+applies to your existing study and declared feed.
+
+## App workflow
+
+Use **Overview** for readiness, runner status, heartbeat and the latest proposal.
+**Setup** detects existing files; complete only missing steps. **Decisions** shows
+integrity-verified proposal history and details. **Portfolio** shows declared
+simulated holdings and dated NAV marks. **Activity** shows bounded job output and
+safe errors. Refreshing reads local files only; it does not poll a data provider.
+
+Keys remain blank in Setup. **Save keys locally** explicitly writes your input to
+`~/.config/alpaca/paper.env` outside the checkout with private permissions; existing
+values are never displayed. Starting cash can initialize only a fresh book without
+existing portfolio or decision/fill history. The app does not replace audit history
+or clear halts to make Setup pass.
+
+**Download data & run study** requires an explicit click and confirmation before
+provider downloads. Completed qualified evidence is reused; rejected/corrupt
+evidence remains available for review. **Check data connection** runs the existing
+readiness-gated calendar/notification check; **Start runner** uses the existing
+readiness-gated daily workflow. These actions may contact configured services.
+Stop active jobs before changing keys or the book.
+
+For a simulated fill, stop the runner and open Portfolio. Only the full latest
+verified BUY/SELL can be recorded, exactly once. Declare a positive fill price and
+nonnegative fees. The session snapshot must match current cash, settled cash,
+shares and manual halt state; a mismatch blocks accounting. The app journals the
+before/after book durably and recovers only an expected state after interruption.
+Use **Recover pending accounting** for an interrupted fill; it restores an expected
+journal state without declaring settlement or changing a halt. Retain the journal
+and portfolio if it reports divergence; do not repair by deleting history.
+Pending/corrupt fill journals also block terminal runners before readiness or
+network calls. Decisions alone never change holdings.
+
+Buys consume settled cash. Sells add unsettled cash; **Confirm cash settled** is an
+explicit manual declaration, with no automatic settlement timing. Partial fills,
+external deposits and withdrawals are unsupported. Recorded NAV is simulated and
+dated, not a live account balance or P&L. **Halt all proposals** sets the manual
+global halt, blocking all proposals;
+ledger drawdown entry halts block buys while permitting eligible signal exits.
+Neither halt is cleared by the app, settlement, recovery or restart.
+
 ## Local environment
 
 Use WSL/Ubuntu with Python 3.11+ and keep the checkout under the Linux home directory.
-Install git, make, Python, tzdata, CA certificates and curl. From the checkout:
+Ubuntu 24.04 provides a suitable Python. First-time WSL and package installation is
+in [SETUP.md](../../SETUP.md). Install git, make, Python, tzdata, CA certificates and
+curl. The runtime uses the standard library and bundled assets, with no npm install
+or CDN. This is not a native Windows installer. From the checkout:
 
 ```sh
 make check build demo
@@ -75,18 +146,21 @@ only as a risk-control overlay. Diagnostics cannot rescue a rejected result.
 The readiness gate authenticates the actual bundle/config/protocol/code, freeze,
 validation and holdout against original registry payloads; files alone are not enough.
 
-## Manual shadow book
+## Manual shadow book (CLI alternative)
 
 ```sh
 mkdir -p .research-output/shadow
-cp examples/shadow/portfolio.template.json .research-output/shadow/portfolio.json
+test -f .research-output/shadow/portfolio.json || cp examples/shadow/portfolio.template.json .research-output/shadow/portfolio.json
 ```
 
 Set cash, settled cash, shares and peak NAV for the modeled strategy account. The
-example balance is a fixture. After a modeled BUY/SELL, update the book explicitly.
-There is no broker reconciliation or fill accounting. Unpaid dividends/other assets
-are not represented in the shadow NAV. External deposits/withdrawals need an
-accounting review rather than simply changing cash and resetting the peak.
+example balance is a fixture. The CLI-only book requires explicit JSON updates
+after a modeled BUY/SELL and has no fill journal. The app adds the separate manual
+simulated-fill journal described above; use those controls for an app-journaled
+book, since direct JSON edits can block accounting recovery. Neither workflow
+reconciles with a broker. Unpaid dividends/other assets are not represented in the
+shadow NAV. External deposits/withdrawals are unsupported in the app; do not simply
+change cash or reset the peak.
 
 The ledger keeps observed peaks and latched drawdown entry halts. Restart, recovery
 or lowering the declared peak cannot clear a breach. A manual `halted: true` blocks
@@ -95,7 +169,7 @@ remain eligible after a drawdown halt, subject to order/capacity checks. A halt
 neither guarantees cancellation nor liquidation. Legacy ledgers lacking risk memory
 block new sessions pending reviewed migration; retain their history.
 
-## Daily operator workflow
+## Daily operator workflow (CLI alternative)
 
 ```sh
 ./scripts/run_daily.sh --check
@@ -148,6 +222,9 @@ heartbeat alone is not proof that a daily decision arrived or the strategy works
 
 | Failure | Response |
 | --- | --- |
+| App port occupied | Reuse the existing app or stop its launch terminal; alternatively launch with `./scripts/run_app.sh --port 8766` and use `http://localhost:8766`. |
+| External runner active | Stop the runner in its owning terminal before app Start or book changes. |
+| Fill snapshot/journal mismatch | Preserve portfolio, snapshot and accounting journal; review divergence before further changes. |
 | Evidence/readiness error | Preserve records; compare source/config/protocol and mechanical verdict. No override to force progression. |
 | Already released holdout | Keep registry; separately freeze fresh future final dates. |
 | Legacy risk ledger | Retain history and review migration; do not delete/reset it. |

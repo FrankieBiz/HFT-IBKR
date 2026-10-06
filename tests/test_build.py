@@ -9,6 +9,20 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class BuildTests(unittest.TestCase):
+    def test_app_command_and_assets_are_packaged_without_runtime_downloads(self):
+        from zipfile import ZipFile
+        with tempfile.TemporaryDirectory() as folder:
+            archive=Path(folder)/'app.pyz'
+            result=subprocess.run([sys.executable,str(ROOT/'scripts/build.py'),'--output',str(archive)],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            with ZipFile(archive) as bundle:
+                for name in ('index.html','app.css','app.js'):
+                    self.assertEqual(bundle.read('quant_app/assets/'+name),(ROOT/'quant_app/assets'/name).read_bytes())
+                self.assertFalse(any(name.endswith(('.env','.sqlite')) for name in bundle.namelist()))
+            result=subprocess.run([sys.executable,str(archive),'app','--help'],cwd=folder,env={},capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertIn('--no-browser',result.stdout)
+
     def test_shadow_session_command_is_available_outside_checkout(self):
         with tempfile.TemporaryDirectory() as folder:
             archive = Path(folder) / 'shadow.pyz'

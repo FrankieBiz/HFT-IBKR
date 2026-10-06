@@ -10,8 +10,8 @@ from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 ROOT=Path(__file__).resolve().parents[1]
 ENTRY='''import sys
-if len(sys.argv)<2 or sys.argv[1] not in ('research','control','local','data','view','session'):
-    print('Usage: python3 quant-system.pyz {research|control|local|data|view|session} COMMAND [OPTIONS]',file=sys.stderr)
+if len(sys.argv)<2 or sys.argv[1] not in ('research','control','local','data','view','session','app'):
+    print('Usage: python3 quant-system.pyz {research|control|local|data|view|session|app} COMMAND [OPTIONS]',file=sys.stderr)
     sys.exit(2)
 command=sys.argv.pop(1)
 if command=='research':
@@ -22,6 +22,8 @@ elif command=='local':
     from quant_local.__main__ import main
 elif command=='data':
     from quant_data.__main__ import main
+elif command=='app':
+    from quant_app.__main__ import main
 elif command=='session':
     from quant_session.__main__ import main
 else:
@@ -33,9 +35,12 @@ sys.exit(main())
 def build(destination):
     # Only explicit source packages are included; no local data, journals or secrets.
     sources={'__main__.py':ENTRY.encode()}
-    for package in ('quant_research','quant_control','quant_local','quant_data','quant_view','quant_session'):
+    for package in ('quant_research','quant_control','quant_local','quant_data','quant_view','quant_session','quant_app'):
         for path in sorted((ROOT/package).glob('*.py')):
             sources[f'{package}/{path.name}']=path.read_bytes()
+    for path in sorted((ROOT/'quant_app/assets').iterdir()):
+        if path.suffix in ('.html','.css','.js'):
+            sources[f'quant_app/assets/{path.name}']=path.read_bytes()
     buffer=io.BytesIO()
     with ZipFile(buffer,'w',compression=ZIP_DEFLATED,compresslevel=9) as archive:
         for name,content in sorted(sources.items()):

@@ -4,6 +4,67 @@ Detailed commands and contracts for each component, moved from the README on
 2026-10-05. The README explains how the daily system decides and when it acts; this
 page is the command-level reference. Everything here is offline unless stated.
 
+## Local operator app
+
+`quant_app` provides Overview, Setup, Decisions, Portfolio and Activity in a local
+browser. Python 3.11+, Bash and POSIX locks are required; use WSL/Ubuntu on Windows.
+The runtime is standard-library-only with bundled HTML/CSS/JavaScript, no npm or
+CDN assets. From the checkout:
+
+```sh
+./scripts/run_app.sh
+# Equivalent module entry point:
+python3 -m quant_app
+# Portable entry point, still requiring the checkout for scripts and study files:
+python3 dist/quant-system.pyz app --root "$PWD"
+```
+
+The backend binds to `127.0.0.1:8765`, opens `http://localhost:8765` and uses
+`cmd.exe` to open the Windows browser under WSL. Options include `--port NUMBER`
+and `--no-browser`; `--root PATH` identifies the checkout. The optional
+`Start-Trading-App.cmd` desktop launcher uses the default WSL distribution and
+`~/HFT-IBKR`. It is not a native installer. See the
+[Windows/WSL runbook](../operations/windows-wsl-runbook.md).
+
+No job, download or provider request starts from launch/status refresh. Explicit
+buttons run fixed local checks, the historical study, the readiness-gated data
+connection check or daily runner. Study/evidence, feed, source and risk gates remain
+in force. The app reuses existing study/registry/ledger/book paths and never resets
+history. Existing qualified SIP studies retain SIP and the corrected request window.
+
+The app supervises one owned job at a time and shares the runner lock with terminal
+starts. Stop affects owned process groups only; external runners must be stopped
+in their terminals. Ctrl-C in the launch terminal stops the backend and its owned
+jobs; browser closure leaves them running. Book/key actions are blocked while an
+app job or external runner is active. App state lives in ignored
+`.research-output/app/`; explicit fill accounting is in
+`.research-output/shadow/fills.sqlite`.
+
+Key-entry fields are blank and never reveal stored values. Save explicitly writes
+private `~/.config/alpaca/paper.env` outside Git. Starting cash initializes only a
+fresh portfolio with no decision/fill history. Decisions come from whole-chain
+verified ledger history; corrupt evidence blocks display/progression rather than
+being replaced by arbitrary reports.
+
+A BUY/SELL remains a proposal until the operator explicitly records the full latest
+verified proposal's simulated fill. The app verifies its original session snapshot
+against current book cash, settled cash, shares and halt state, requires a positive
+price and nonnegative fees, and journals before/after hashes with a unique decision
+identity. Duplicate fills and unexplained book divergence fail closed.
+**Recover pending accounting** explicitly completes a recoverable interrupted
+journal update without changing settlement or halt state; pending/corrupt fill
+journals also block terminal runners before readiness or network calls. Buys spend
+settled cash; sells add unsettled proceeds. Settlement is an explicit operator
+confirmation, not a clock or provider event. Partial fills, deposits/withdrawals,
+broker reconciliation and automatic fill inference are unsupported.
+
+Manual global halts and the separate ledger drawdown entry latch are preserved;
+the former blocks all proposals and the latter blocks buys while permitting eligible
+signal exits. There is no app halt reset. Portfolio charts show dated valid simulated
+NAV marks from verified decisions, not live P&L or broker balances. The
+[approved app design](../superpowers/specs/2026-10-06-operator-app-design.md) records
+scope and dated primary references.
+
 ## Integrated daily shadow session
 
 The `session plan` workflow joins completed-session data, a declared schedule, a
@@ -30,7 +91,9 @@ under `.research-output/` with research, validation, holdout, all 14 control sce
 and crash/restart artifacts, plus shadow buy/hold/sell/blocked reports and durable
 retry/conflict checks. `summary.json` records the end-to-end result.
 The portable archive supports `python3 dist/quant-system.pyz research ...` and
-`python3 dist/quant-system.pyz control ...`; it can run outside this checkout.
+`python3 dist/quant-system.pyz control ...`; those commands can run outside this
+checkout. The `app` command bundles the UI but still needs a checkout for its jobs,
+study protocol and operator scripts.
 
 ## Results dashboard
 

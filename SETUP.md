@@ -4,10 +4,72 @@ The current project is a bounded daily SPY research/shadow overlay. It never sen
 orders. Set it up locally first; daily operator scripts require approved historical
 evidence that matches the revised settings. [README](README.md) explains the policy.
 
-## 1. Install and verify offline
+## Existing Windows/WSL installation: launch the app
 
-Use Python 3.11+ on macOS, Linux or Windows with WSL/Ubuntu. On WSL keep the checkout
-in the Linux home directory rather than `/mnt/c`.
+If your keys and study are already set up, reuse them. Stop a runner in its existing
+terminal with Ctrl-C, then run this in Ubuntu:
+
+```sh
+cd ~/HFT-IBKR
+git pull --ff-only origin FrankieBiz/compare-built-system-to
+./scripts/run_app.sh
+```
+
+The app opens in your Windows browser at **http://localhost:8765**. If the browser
+does not open, enter that address yourself. The service binds only to `127.0.0.1`.
+Keep the launch terminal open; Ctrl-C stops the backend and its owned jobs. Closing
+the browser leaves them running. Optional: copy `Start-Trading-App.cmd` from the
+checkout to your Windows desktop. Double-click it for future starts; it expects
+`~/HFT-IBKR` in your default WSL distribution.
+
+Retain `.research-output/`, the shared study registry, portfolio and decision/fill
+ledgers. **Do not rerun your completed study or re-enter existing keys to use the
+app.** The recent-SIP request-window repair is retained; see step 3 if needed.
+If local source edits prevent the fast-forward pull, preserve them before updating.
+
+## Use the app
+
+| Tab | What to do |
+| --- | --- |
+| Overview | Review readiness, heartbeat and latest verified proposal. Start runner explicitly; Stop stops the current app-owned job. |
+| Setup | Complete only missing steps; existing files are reused. |
+| Decisions | Inspect verified BUY/SELL/HOLD/BLOCKED proposals and recorded inputs. |
+| Portfolio | Inspect declared simulated holdings and dated NAV marks; record an explicit simulated fill or confirm settlement. |
+| Activity | Read recent job progress and safe failure details. |
+
+Setup key fields stay blank; **Save keys locally** writes only on your action to
+`~/.config/alpaca/paper.env`, outside Git, with restrictive permissions. Existing
+key values are never displayed. **Create simulated book** accepts starting cash
+only for a fresh book with no existing decision/fill history; it cannot replace a
+portfolio. **Download data & run study** contacts the provider only after you click
+and confirm it. A completed qualified study is reused. **Check data connection**
+and **Start runner** also contact configured services after readiness checks.
+Opening or refreshing the app only reads local state and starts none of these jobs.
+
+The runner records proposals, not fills. In Portfolio, record only the full latest
+verified BUY/SELL with your declared positive fill price and nonnegative fees. The
+app verifies the session snapshot against the current cash, settled cash, shares
+and halt state, journals the fill exactly once and rejects duplicates or mismatches.
+If an interrupted fill is pending, use **Recover pending accounting** to complete its
+journal recovery without declaring settlement or changing a halt. Unexpected book
+divergence blocks recovery; retain the files for review. Pending/corrupt fill
+journals also block terminal runners before readiness or network calls.
+Buys spend settled cash; sells add unsettled proceeds. Use **Confirm cash settled**
+only when your simulated settlement assumption is satisfied; there is no automatic
+settlement clock. Deposits, withdrawals and partial fills are unsupported.
+
+**Halt all proposals** sets the manual global halt and blocks all proposals. The ledger's separate drawdown entry
+latch blocks new buys while permitting eligible signal exits. The app preserves
+both and offers no halt reset. Neither means the account is flat. Stop app-owned
+jobs before book/key changes; a runner owned by another terminal must be stopped
+there. The NAV chart shows recorded simulated marks, not broker balances or live P&L.
+
+## 1. First installation and offline verification
+
+Use Python 3.11+ on macOS, Linux or Windows with WSL/Ubuntu. This is a browser app
+backed by a POSIX Python service, not a native Windows installer. It uses bundled
+HTML/CSS/JavaScript and the standard library; no npm or CDN dependency is needed.
+On WSL keep the checkout in the Linux home directory rather than `/mnt/c`.
 
 If WSL is not installed, run this in **PowerShell as Administrator**, restart if
 prompted, then open Ubuntu and complete its username/password setup:
@@ -51,7 +113,8 @@ make check build demo
 
 Tests should finish with `OK`; the synthetic demo should report
 `offline_workflows_passed`. No data keys, broker login or network access are needed
-for these checks. The portable application is `dist/quant-system.pyz`.
+for these checks. The portable application is `dist/quant-system.pyz`. Then launch
+`./scripts/run_app.sh` and follow the app workflow above.
 
 ## 2. Understand the study gate
 
@@ -119,7 +182,7 @@ It preserves finished steps, records diagnostics and applies the mechanical verd
 A successful command alone does not mean the verdict permits shadowing. The daily
 runner independently authenticates the records and enforces that verdict.
 
-## 4. Prepare the manual shadow book
+## 4. Prepare the manual shadow book (CLI alternative)
 
 ```sh
 mkdir -p .research-output/shadow
@@ -129,15 +192,17 @@ nano .research-output/shadow/portfolio.json
 
 Set `cash`, `settled_cash` and `peak_nav` to your **modeled strategy account** value;
 leave `shares` at zero initially. The example capital is not an allocation
-recommendation. After a modeled fill, edit shares and cash yourself. No broker
-position is read and nothing updates this book automatically. Do not mix deposits,
-withdrawals or other assets into an ongoing ledger without an accounting review.
+recommendation. For a CLI-only book, edit shares and cash yourself after a modeled
+fill; the CLI has no fill journal. Prefer the app's explicit simulated-fill workflow
+above once you use its journal. No broker position is read or proposal filled
+automatically. Direct edits to an app-journaled book can block accounting recovery.
+Do not mix deposits, withdrawals or other assets into an ongoing ledger.
 
 Setting `halted` to true blocks all proposals. Drawdown memory is held in the ledger
 and cannot be cleared by lowering this file's peak or restarting. Preserve legacy
 ledgers; those without risk memory require reviewed migration, not deletion.
 
-## 5. Start only after readiness passes
+## 5. Start only after readiness passes (CLI alternative)
 
 ```sh
 ./scripts/run_daily.sh --check

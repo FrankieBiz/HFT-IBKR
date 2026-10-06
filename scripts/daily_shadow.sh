@@ -4,6 +4,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PYTHON=${PYTHON:-python3}
+if [[ ${HFT_RUNNER_LOCK_OWNER:-} != "$PPID" ]] || ! "$PYTHON" scripts/runner_lock.py --verify-held; then
+  exec "$PYTHON" scripts/runner_lock.py daily_shadow.sh "$@"
+fi
 CONFIG=${CONFIG:-}
 PORTFOLIO=${PORTFOLIO:-.research-output/shadow/portfolio.json}
 ROOT=.research-output/shadow

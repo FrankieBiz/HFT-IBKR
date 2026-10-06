@@ -1,4 +1,4 @@
-# Local operator app — proposed design
+# Local operator app — approved design
 
 Status: approved by the user on 2026-10-06: "Build the whole thing then."
 
@@ -134,3 +134,8 @@ Primary design references verified 2026-10-06:
 - [Python HTTP server](https://docs.python.org/3/library/http.server.html): the standard
   library server supports local serving, but its basic checks require explicit Host,
   Origin, request-size, capability and filesystem boundaries for this app.
+
+Shutdown implementation reference checked 2026-10-06:
+- [Linux proc_pid_stat(5)](https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html):
+  process state and group fields let Linux shutdown distinguish non-running zombie
+  records from surviving owned work; the guardian retains locks through group cleanup.

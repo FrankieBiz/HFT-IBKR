@@ -17,37 +17,37 @@ Bash and a Windows launcher. No new installed runtime dependencies.
 
 ## File ownership and tasks
 
-- [ ] Review approved spec and plan independently; resolve blockers.
-- [ ] Backend service: create `quant_app/{__init__,service}.py` and
+- [x] Review approved spec and plan independently; resolve blockers.
+- [x] Backend service: create `quant_app/{__init__,service}.py` and
   `tests/test_app_service.py`. Read setup/readiness/verified ledger/health; save
   blank-entered keys outside Git; initialize manual book explicitly; record explicit
   verified-proposal simulated fills exactly once with recoverable accounting;
   preserve manual/global and ledger drawdown halts. No network on status reads.
-- [ ] Add `DecisionLedger.history()` with read-only whole-chain verification and
+- [x] Add `DecisionLedger.history()` with read-only whole-chain verification and
   bounded returned history. Add corruption/missing/read-only regressions.
-- [ ] Process layer: create `quant_app/jobs.py`, `scripts/runner_lock.py`,
+- [x] Process layer: create `quant_app/jobs.py`, `scripts/runner_lock.py`,
   `tests/test_app_jobs.py`, `tests/test_runner_lock.py`; integrate a runner-wide
   ownership lock into `scripts/run_daily.sh`. Allow only checks, study, setup_check,
   runner. Serialize jobs, bound/redact logs, stop only owned process groups and
   stop owned jobs on server shutdown. Detect external runners without killing them.
-- [ ] HTTP layer: create `quant_app/{server,__main__}.py` and
+- [x] HTTP layer: create `quant_app/{server,__main__}.py` and
   `tests/test_app_server.py`. Loopback only; validate Host/Origin; reject cross-site
   fetches; require unpredictable capability on JSON API reads/actions; restrict
   bodies/content-type/routes; use fixed assets and JSON escaping, no shell/path API.
-- [ ] Frontend: create `quant_app/assets/{index.html,app.css,app.js}`. Responsive
+- [x] Frontend: create `quant_app/assets/{index.html,app.css,app.js}`. Responsive
   sidebar, Overview/Setup/Decisions/Portfolio/Activity, refresh local state, key/book
   forms, explicit simulated fills and halt controls, charts and decision detail.
   Clear missing/corrupt/stale/empty states. Do not invent prices or filled trades.
-- [ ] Launchers: `scripts/run_app.sh`, `Start-Trading-App.cmd`; show prerequisite
+- [x] Launchers: `scripts/run_app.sh`, `Start-Trading-App.cmd`; show prerequisite
   failures, open local browser, explain console lifetime and shutdown ownership.
-- [ ] Build/docs: package app/assets in `scripts/build.py`, include app in compile
+- [x] Build/docs: package app/assets in `scripts/build.py`, include app in compile
   checks and portable dispatch. Update README/SETUP/WSL runbook/component reference.
-- [ ] Browser integration: use installed Playwright and invented temporary fixture
+- [x] Browser integration: use installed Playwright and invented temporary fixture
   root/home only. Check setup, navigation, simulated history, Start/Stop states,
   errors, mobile layout, no external asset requests and console errors. Save screenshots.
-- [ ] Independent spec compliance then code/security review; fix substantive issues.
-- [ ] Run `make check build demo`, shell/JS checks, staged diff checks; record evidence.
-- [ ] Commit/push the existing feature branch, update its draft PR, verify remote
+- [x] Independent spec compliance then code/security review; fix substantive issues.
+- [x] Run `make check build demo`, shell/JS checks, staged diff checks; record evidence.
+- [x] Commit/push the existing feature branch, update its draft PR, verify remote
   SHA and report exact Windows/WSL launch instructions and limitations.
 
 ## Shared Python / JSON contract
@@ -95,3 +95,21 @@ Do not weaken existing gates or erase history to make application tests pass.
   until child exit, and forward shutdown signals. App mutations use the same lock.
 - Capability bootstrap checks exact local Host/Origin and Fetch Metadata; no CORS
   or caching. Stop authority comes from owned process handles, never stored PIDs.
+
+## Verification evidence — 2026-10-06
+
+- Independent design/plan and final spec reviews approved; code/security review
+  approved after separating manual global halt from entry-only drawdown memory,
+  providing explicit recovery, covering terminal accounting gates and closing the
+  surviving-descendant shutdown case. Study jobs use the same group guardian.
+- Actual macOS process tests exercise nested runners and uncooperative descendants
+  on both Stop and close. Linux zombie/group parsing uses invented `/proc` fixtures;
+  an actual Windows/WSL installation was not available locally.
+- `make check build demo`: **318 tests** passed; see [validation notes](../../research/2026-10-06-operator-app-validation.md).
+- Browser integration: Chromium, invented temporary checkout/config and fake keys.
+  Setup preserves the qualified SIP fixture; key/book actions, verified decision
+  detail, explicit fill, pending recovery, Start/Stop, active-job controls, corruption
+  errors, mobile width, no external assets and no browser console errors pass.
+- `node --check quant_app/assets/app.js`, Bash syntax and diff whitespace checks pass.
+- Source includes `scripts/check_app_browser.py` to reproduce optional UI checks.
+  Playwright remains an optional developer dependency, not an app prerequisite.

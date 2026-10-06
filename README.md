@@ -9,8 +9,40 @@ makes one decision per trading session and may hold a position for months.
 order-control simulation, shadow decisions and future broker execution are separate.
 The strategy has no demonstrated edge or live performance record in this checkout.
 
-Start with [SETUP.md](SETUP.md). The current direction and remaining work are in the
+## Open the local operator app
+
+For an existing Windows/WSL checkout in `~/HFT-IBKR`, stop any terminal runner
+with Ctrl-C, then run these commands in Ubuntu:
+
+```sh
+cd ~/HFT-IBKR
+git pull --ff-only origin FrankieBiz/compare-built-system-to
+./scripts/run_app.sh
+```
+
+The launcher opens your Windows browser at **http://localhost:8765**. Keep the app
+terminal open: Ctrl-C stops the app and its owned jobs; closing the browser leaves
+it running. Optionally copy `Start-Trading-App.cmd` to your Windows desktop for
+later starts. It uses your default WSL distribution and `~/HFT-IBKR`.
+
+The five tabs are Overview, Setup, Decisions, Portfolio and Activity. Setup reuses
+existing keys, completed study evidence and the manual book. Opening the app starts
+no jobs or downloads. Use **Start runner** when ready; **Stop** stops an app-owned
+job. A runner started in another terminal must be stopped in that terminal.
+Preserve `.research-output/`, study registries and ledgers; do not rerun a completed
+study to install the app or repair a recent-SIP download error.
+
+Python 3.11+ and WSL/Ubuntu or another POSIX checkout are required. The app uses the
+Python standard library and bundled browser assets; no npm install or CDN is
+needed. This is a local browser app, not a native Windows installer. See
+[SETUP.md](SETUP.md) for prerequisites and app actions, and the
+[Windows/WSL runbook](docs/operations/windows-wsl-runbook.md) for operations.
+The current direction and remaining work are in the
 [delivery plan](docs/plans/quant-trading-delivery-plan.md).
+
+Interface preview with **invented test data**, not a real study or account:
+
+![Local trading desk preview](docs/images/trading-desk.png)
 
 ## The strategy
 
@@ -96,9 +128,14 @@ cannot change the signal.
 
 Data/calendar/dividend checks, stale or future quotes, stale portfolio snapshots,
 manual halts, declared unreconciled/pending/uncertain state, cash, exposure and
-liquidity limits can block a proposal. The portfolio remains a **manual shadow
-book**, not broker-verified holdings or fill accounting. An IEX quote is one venue's
-quote, not the national best quote.
+liquidity limits can block a proposal. The portfolio remains a **manual simulated
+book**, with no broker reconciliation. Decisions are proposals, never automatic
+fills. The app can journal an operator-declared full simulated fill for the latest
+verified BUY/SELL exactly once, using declared prices/fees and the matching session
+snapshot. Buys consume settled cash; sale proceeds remain unsettled until explicit
+manual confirmation. The CLI-only book requires manual updates and has no fill
+journal of its own. Recorded NAV marks are dated simulated values, not live P&L.
+An IEX quote is one venue's quote, not the national best quote.
 
 SQLite serializes planning and recording together. Valid marks preserve observed
 peak NAV and a latched drawdown entry halt across restarts and lower declared peaks.
@@ -127,6 +164,8 @@ older releases lack session claims, it stops for reviewed recovery/migration.
 | `scripts/check_shadow_health.py` | Independent offline health/deadline check |
 | `quant_control` | Separate SIM-only order reservation/reconciliation/journal reference |
 | `quant_view` | Offline snapshot dashboard |
+| `quant_app` | Local operator app, owned jobs, verified decisions and explicit simulated-fill journal |
+| `scripts/run_app.sh` / `Start-Trading-App.cmd` | POSIX/WSL launch and optional Windows desktop shortcut |
 
 The runner emits a local heartbeat while waiting. The health checker detects stale,
 future, missing, stopped or failed heartbeats and missing decisions after a deadline.

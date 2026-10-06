@@ -23,8 +23,10 @@ class RunnerGateTests(unittest.TestCase):
         self.calls = self.root/'calls'
         self.python = self.root/'python'
         self.python.write_text('''#!/usr/bin/env python3
-import pathlib, sys
+import os, pathlib, sys
 pathlib.Path(__file__).with_name('calls').open('a').write(' '.join(sys.argv[1:])+'\\n')
+if len(sys.argv)>1 and sys.argv[1].endswith('runner_lock.py'):
+    os.execv(sys.executable,[sys.executable,*sys.argv[1:]])
 if sys.argv[1:3] == ['-m', 'quant_session.readiness']:
     print('readiness error: missing historical evidence', file=sys.stderr)
     sys.exit(2)
@@ -247,10 +249,12 @@ os.execv(REAL_PYTHON, [REAL_PYTHON, *sys.argv[1:]])
 
     def fake_operational_runner(self, state):
         self.python.write_text('''#!/usr/bin/env python3
-import pathlib, sys
+import os, pathlib, sys
 root = pathlib.Path(__file__).parent
 with (root/'calls').open('a') as out:
     out.write(' '.join(sys.argv[1:])+'\\n')
+if len(sys.argv)>1 and sys.argv[1].endswith('runner_lock.py'):
+    os.execv(sys.executable,[sys.executable,*sys.argv[1:]])
 if sys.argv[1:3] in (['-m', 'quant_session.readiness'], ['-m', 'quant_session.health']):
     sys.exit(0)
 if sys.argv[1:3] == ['-m', 'quant_session']:
@@ -268,7 +272,7 @@ if sys.argv[1] == '-':
         bindir.mkdir()
         sleeper = bindir/'sleep'
         sleeper.write_text('''#!/usr/bin/env python3
-import pathlib, sys
+import os, pathlib, sys
 with pathlib.Path(__file__).parent.parent.joinpath('calls').open('a') as out:
     out.write('sleep '+' '.join(sys.argv[1:])+'\\n')
 sys.exit(2)

@@ -8,6 +8,9 @@ cd "$(dirname "$0")/.."
 PYTHON=${PYTHON:-python3}
 MODE=${1:-}
 case "$MODE" in ''|--check|--once) ;; *) echo 'Usage: run_daily.sh [--check|--once]' >&2; exit 2;; esac
+if [[ ${HFT_RUNNER_LOCK_OWNER:-} != "$PPID" ]] || ! "$PYTHON" scripts/runner_lock.py --verify-held; then
+  exec "$PYTHON" scripts/runner_lock.py run_daily.sh "$@"
+fi
 source scripts/shadow_common.sh
 readiness >/dev/null
 LOG=.research-output/shadow/run.log

@@ -157,3 +157,22 @@ class DecisionLedger:
         except sqlite3.Error as error:
             raise InputError(f'cannot read decision ledger: {error}') from error
         raise InputError('no recorded decision for session')
+
+    def history(self, limit=500):
+        """Return (newest reports, total), verifying the entire chain read-only.
+
+        Missing storage is an error, never an invitation to initialize history.
+        The bounded projection does not weaken verification of earlier records.
+        """
+        if type(limit) is not int or not 1 <= limit <= 500:
+            raise InputError('history limit must be a whole number from 1 to 500')
+        try:
+            uri = self.path.resolve().as_uri() + '?mode=ro'
+            with closing(sqlite3.connect(uri, uri=True, timeout=10)) as connection:
+                connection.execute('PRAGMA query_only=ON')
+                connection.execute('BEGIN')
+                rows = self._rows(connection)
+                self._memory(rows)
+                return [row[2] for row in reversed(rows[-limit:])], len(rows)
+        except sqlite3.Error as error:
+            raise InputError(f'cannot read decision ledger: {error}') from error
