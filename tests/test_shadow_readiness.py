@@ -15,7 +15,8 @@ from test_evaluation import inputs
 from test_inputs import raw_config
 
 
-def evidence(folder, *, kind='historical', trend_return='0.1', drawdown='0.05', real_bundle=False):
+def evidence(folder, *, kind='historical', trend_return='0.1', drawdown='0.05', real_bundle=False,
+             feed='iex', price_reference=None):
     dataset, config, raw = inputs(list(range(100, 118)))
     dataset = replace(dataset, manifest={'kind': kind})
     if real_bundle:
@@ -28,6 +29,9 @@ def evidence(folder, *, kind='historical', trend_return='0.1', drawdown='0.05', 
         calendar.write_text('session\n' + ''.join(f'{b.session}\n' for b in dataset.bars))
         declared = json.loads(metadata.read_text())
         declared['kind'] = kind  # Invented fixture exercising declared historical provenance only.
+        declared['sources']['prices']['reference'] = price_reference or (
+            'https://data.alpaca.markets/v2/stocks/bars symbols=SPY timeframe=1Day '
+            f'adjustment=raw feed={feed}; invented fixture, no market data')
         metadata.write_text(canonical_json(declared))
         prepare_bundle(prices, distributions, calendar, metadata, folder/'spy.qdata')
         dataset = read_bundle(folder/'spy.qdata')
@@ -85,6 +89,58 @@ class ReadinessTests(unittest.TestCase):
         with self.assertRaises(InputError):
             self.check(dataset, paths)
         self.assertFalse(paths['registry.sqlite'].exists())
+
+    def test_operational_feed_is_bound_to_authenticated_study_and_daily_bundle(self):
+        for feed in ('iex', 'sip'):
+            folder = self.folder / feed
+            folder.mkdir()
+            dataset, paths = evidence(folder, real_bundle=True, feed=feed)
+            result = self.check(dataset, paths, require_alpaca_feed=True,
+                                daily_bundle=folder/'spy.qdata')
+            self.assertEqual(result['price_feed'], feed)
+
+    def test_mismatched_daily_feed_rejected_before_operations(self):
+        from quant_data.bundle import prepare_bundle, read_bundle
+        dataset, paths = evidence(self.folder, real_bundle=True, feed='sip')
+        metadata = self.folder/'metadata.json'
+        declared = json.loads(metadata.read_text())
+        declared['sources']['prices']['reference'] = declared['sources']['prices']['reference'].replace('feed=sip', 'feed=iex')
+        metadata.write_text(canonical_json(declared))
+        daily = self.folder/'daily.qdata'
+        prepare_bundle(self.folder/'prices.csv', self.folder/'distributions.csv',
+                       self.folder/'calendar.csv', metadata, daily)
+        with patch.object(self.readiness, 'read_bundle', side_effect=[dataset, read_bundle(daily)]), \
+                self.assertRaisesRegex(InputError, 'feed.*mismatch'):
+            self.readiness.verify_readiness(bundle=self.folder/'spy.qdata',
+                config=paths['config.json'], protocol=paths['protocol.json'], selection=paths['selection.json'],
+                holdout=paths['holdout.json'], registry=paths['registry.sqlite'], daily_bundle=daily)
+
+    def test_operational_feed_requires_unambiguous_alpaca_provenance(self):
+        for i, reference in enumerate(('synthetic fixture',
+                'https://data.alpaca.markets/v2/stocks/bars feed=auto',
+                'https://data.alpaca.markets/v2/stocks/bars feed=sip feed=iex',
+                'https://other.example/v2/stocks/bars feed=iex')):
+            folder = self.folder / str(i)
+            folder.mkdir()
+            dataset, paths = evidence(folder, real_bundle=True, price_reference=reference)
+            with self.subTest(reference=reference), self.assertRaisesRegex(InputError, 'feed'):
+                self.check(dataset, paths, require_alpaca_feed=True)
+
+    def test_synthetic_daily_bundle_cannot_use_historical_study_evidence(self):
+        from quant_data.bundle import prepare_bundle, read_bundle
+        dataset, paths = evidence(self.folder, real_bundle=True, feed='sip')
+        metadata = self.folder/'metadata.json'
+        declared = json.loads(metadata.read_text())
+        declared['kind'] = 'synthetic'
+        metadata.write_text(canonical_json(declared))
+        daily = self.folder/'synthetic.qdata'
+        prepare_bundle(self.folder/'prices.csv', self.folder/'distributions.csv',
+                       self.folder/'calendar.csv', metadata, daily)
+        with patch.object(self.readiness, 'read_bundle', side_effect=[dataset, read_bundle(daily)]), \
+                self.assertRaisesRegex(InputError, 'historical daily'):
+            self.readiness.verify_readiness(bundle=self.folder/'spy.qdata',
+                config=paths['config.json'], protocol=paths['protocol.json'], selection=paths['selection.json'],
+                holdout=paths['holdout.json'], registry=paths['registry.sqlite'], daily_bundle=daily)
 
     def test_synthetic_negative_dominated_and_nonfinite_evidence_fail(self):
         for i, kwargs in enumerate(({'kind': 'synthetic'}, {'trend_return': '-0.01'},

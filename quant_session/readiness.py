@@ -7,10 +7,12 @@ from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 from pathlib import Path
+import re
 import sqlite3
 import sys
 
 from quant_data.bundle import read_bundle
+from quant_data.alpaca import DATA_URL, FEEDS
 from quant_research.__main__ import source_identity
 from quant_research.config import parse_config
 from quant_research.evaluation import digest, freeze_selection, parse_protocol, verify_selection
@@ -82,11 +84,27 @@ def _stored_result(connection, run_id, kind, identities, artifact_digest):
     return report
 
 
-def verify_readiness(*, bundle, config, protocol, selection, holdout, registry, planning_config=None):
+def _price_feed(dataset):
+    source = dataset.manifest.get('source')
+    prefix = 'Offline intake v1: '
+    if not isinstance(source, str) or not source.startswith(prefix):
+        raise InputError('operational price feed requires declared Alpaca intake provenance')
+    audit = json.loads(source[len(prefix):], object_pairs_hook=_pairs)
+    reference = audit['metadata']['sources']['prices']['reference']
+    if not isinstance(reference, str) or reference.split(' ', 1)[0] != DATA_URL + '/v2/stocks/bars':
+        raise InputError('operational price feed requires Alpaca stock bars provenance')
+    feeds = re.findall(r'(?<!\S)feed=([^\s;]+)', reference)
+    if len(feeds) != 1 or feeds[0] not in FEEDS:
+        raise InputError('operational price feed must be exactly one declared iex or sip feed')
+    return feeds[0]
+
+
+def verify_readiness(*, bundle, config, protocol, selection, holdout, registry, planning_config=None,
+                     require_alpaca_feed=False, daily_bundle=None):
     """Return verified selected config and verdict; all evidence reads stay local.
 
-    The daily bundle is deliberately absent: identities belong to the immutable
-    original study bundle, original base config and current research source code.
+    Frozen identities belong to the immutable original study bundle, base config
+    and current research source. Optional daily data must retain the study's feed.
     The registry is opened in read-only mode and never initialized or migrated.
     """
     try:
@@ -149,9 +167,18 @@ def verify_readiness(*, bundle, config, protocol, selection, holdout, registry, 
         selected = replace(base, lookback=artifact['selected_lookback'])
         if planning_config is not None and parse_config(read_json(planning_config)) != selected:
             raise InputError('planning config may change only the frozen selected lookback')
-        return {'status': 'ready_for_shadow', 'proceed_to_shadow': True, 'outcome': outcome,
+        result = {'status': 'ready_for_shadow', 'proceed_to_shadow': True, 'outcome': outcome,
                 'selected_lookback': selected.lookback, 'artifact_digest': artifact['integrity_digest'],
                 'planning_config': json.loads(canonical_json(asdict(selected)))}
+        if require_alpaca_feed or daily_bundle is not None:
+            result['price_feed'] = _price_feed(dataset)
+            if daily_bundle is not None:
+                daily = read_bundle(daily_bundle)
+                if daily.manifest['kind'] != 'historical':
+                    raise InputError('operator workflows require historical daily provenance')
+                if _price_feed(daily) != result['price_feed']:
+                    raise InputError('daily price feed mismatch with authenticated study; preserve inputs for review')
+        return result
     except (OSError, sqlite3.Error, ValueError, KeyError, IndexError, TypeError, AttributeError, UnicodeError, RecursionError, ArithmeticError) as error:
         if isinstance(error, InputError):
             raise
@@ -164,10 +191,13 @@ def main(argv=None):
         parser.add_argument('--' + name, required=True, type=Path)
     parser.add_argument('--planning-config', type=Path)
     parser.add_argument('--config-out', type=Path)
+    parser.add_argument('--daily-bundle', type=Path)
+    parser.add_argument('--feed-only', action='store_true', help='Authenticate evidence and print its Alpaca price feed.')
     args = parser.parse_args(argv)
     try:
         result = verify_readiness(**{name: getattr(args, name) for name in (
-            'bundle', 'config', 'protocol', 'selection', 'holdout', 'registry', 'planning_config')})
+            'bundle', 'config', 'protocol', 'selection', 'holdout', 'registry', 'planning_config', 'daily_bundle')},
+            require_alpaca_feed=args.feed_only)
         if args.config_out is not None:
             # Never overwrite supplied evidence or a custom config.
             protected = [getattr(args, name).resolve() for name in ('bundle', 'config', 'protocol', 'selection', 'holdout', 'registry')]
@@ -180,7 +210,8 @@ def main(argv=None):
                     raise InputError('existing selected config differs from verified freeze')
             else:
                 publish_report(args.config_out, content)
-        print(canonical_json(result), end='')
+        print(result['price_feed'] if args.feed_only else canonical_json(result),
+              end='\n' if args.feed_only else '')
         return 0
     except InputError as error:
         print(f'readiness error: {error}', file=sys.stderr)

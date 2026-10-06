@@ -109,6 +109,7 @@ else:
         today = datetime.now(ZoneInfo('America/New_York')).date().isoformat()
         day = self.root/'.research-output/shadow'/today
         day.mkdir(parents=True)
+        shutil.copyfile(study/'spy.qdata', day/'spy.qdata')
         report = decide(*fixtures())
         report['execution_session'] = today
         report['decision_id'] = decision_digest(report)
@@ -160,6 +161,59 @@ else:
         self.assertNotIn('UNVERIFIED', result.stdout)
         self.assertIn('differs from verified ledger', result.stderr)
         self.assertFalse(self.marker.exists())
+
+    def test_daily_preserves_sip_study_feed_and_blocks_mismatched_cache(self):
+        import sys
+        from quant_data.bundle import prepare_bundle
+        from test_shadow_readiness import evidence
+        for package in ('quant_research', 'quant_session', 'quant_data'):
+            shutil.copytree(ROOT/package, self.root/package)
+        study = self.root/'.research-output/spy-trend-v2'
+        study.mkdir(parents=True)
+        _, paths = evidence(study, real_bundle=True, feed='sip')
+        shared = self.root/'.research-output/spy-daily-v1'
+        shared.mkdir()
+        registry = shared/'experiments.sqlite'
+        shutil.move(paths['registry.sqlite'], registry)
+        before = registry.read_bytes()
+        self.python.write_text('''#!/usr/bin/env python3
+import os, pathlib, sys
+if sys.argv[1:4] == ['-m', 'quant_data', 'fetch-alpaca']:
+    pathlib.Path(__file__).with_name('calls').write_text(' '.join(sys.argv[1:]))
+    sys.exit(2)  # stop before any credentials/transport/network are used by Python
+os.execv(REAL_PYTHON, [REAL_PYTHON, *sys.argv[1:]])
+'''.replace('REAL_PYTHON', repr(sys.executable)))
+        self.env.update(STUDY_DIR=str(study), NTFY_TOPIC='')
+        today = datetime.now(ZoneInfo('America/New_York')).date().isoformat()
+        root = self.root/'.research-output/shadow'
+        root.mkdir()
+        shutil.copyfile(ROOT/'examples/shadow/portfolio.template.json', root/'portfolio.json')
+        result = self.run_script('daily_shadow.sh')
+        self.assertEqual(result.returncode, 2, result.stdout+result.stderr)
+        self.assertIn('--feed sip', self.calls.read_text())
+        self.assertTrue(self.marker.exists())
+        self.marker.unlink()
+        self.calls.unlink()
+
+        day = root/today
+        for name in ('prices.csv', 'distributions.csv', 'calendar.csv', 'metadata.json'):
+            shutil.copyfile(study/name, day/name)
+        metadata = json.loads((day/'metadata.json').read_text())
+        metadata['sources']['prices']['reference'] = metadata['sources']['prices']['reference'].replace('feed=sip', 'feed=iex')
+        (day/'metadata.json').write_text(json.dumps(metadata))
+        prepare_bundle(day/'prices.csv', day/'distributions.csv', day/'calendar.csv',
+                       day/'metadata.json', day/'spy.qdata')
+        for cached_plan in (False, True):
+            if cached_plan:
+                (day/'plan.json').write_text('{}')
+            result = self.run_script('daily_shadow.sh')
+            with self.subTest(cached_plan=cached_plan):
+                self.assertEqual(result.returncode, 2, result.stdout+result.stderr)
+                self.assertIn('feed mismatch', result.stderr)
+                self.assertFalse(self.marker.exists(), 'mismatch must fail before credentials')
+                self.assertFalse(self.calls.exists(), 'mismatch must fail before intake')
+                self.assertNotIn('Already recorded', result.stdout)
+        self.assertEqual(registry.read_bytes(), before)
 
     def test_legacy_holdout_without_session_claims_stops_before_credentials(self):
         import sqlite3

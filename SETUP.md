@@ -66,8 +66,13 @@ changed-code evidence also blocks the daily workflow. This is intentional.
 
 ## 3. Configure data access only when you choose to run a study
 
-The existing intake uses Alpaca bars, dividends and calendar, with an IEX quote for
-shadow pricing. Review current provider terms and your entitlement before use.
+The intake defaults to IEX daily/minute bars, with Alpaca dividends/calendar and an
+IEX quote for shadow pricing. IEX covers one exchange; its prices and volume are
+not consolidated market data. The strict calendar/dividend/minute checks remain
+enabled. Operational downloads retain the authenticated study's declared price
+feed; upgrading cannot silently change an existing SIP study to IEX. Cached daily
+bundles must match that feed before a decision can be displayed or planned.
+Review current provider terms and your entitlement before use.
 Save your own paper-data keys in `~/.config/alpaca/paper.env`, outside the repo:
 
 ```sh
@@ -91,6 +96,16 @@ Run the explicit study command when you authorize fetching its inputs:
 ```sh
 ./scripts/run_study.sh
 ```
+
+If an older checkout reports HTTP 403 with "subscription does not permit querying
+recent SIP data", update the published branch using step 1 and rerun this command.
+The updated default requests IEX explicitly. Preserve existing artifacts and the
+registry; a failed fetch publishes no intake directory. Never relabel previously
+downloaded SIP data as IEX or delete released study history to rerun a holdout.
+An existing qualified SIP study continues to request SIP; a new feed requires
+reviewed evidence rather than relabeling or resetting consumed holdouts.
+For a separately authorized standalone SIP download, `quant_data fetch-alpaca`
+accepts `--feed sip`; it never falls back to another feed after an access failure.
 
 It preserves finished steps, records diagnostics and applies the mechanical verdict.
 A successful command alone does not mean the verdict permits shadowing. The daily

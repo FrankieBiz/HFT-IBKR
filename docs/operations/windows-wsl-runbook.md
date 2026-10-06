@@ -18,6 +18,17 @@ This uses local synthetic fixtures. No data keys, broker account or model is
 required. Build output is `dist/quant-system.pyz`; the synthetic report directory
 contains a dashboard, research/evaluation/robustness reports and control rehearsals.
 
+Intake now defaults explicitly to IEX for both daily bars and sampled minute bars.
+It records the feed in source metadata and the cross-check report. IEX is a single
+exchange, so volume and prices do not represent consolidated SIP/official auctions.
+The strict quality checks remain active. Update the branch and retry a failed fetch
+if an older version reports a SIP subscription 403; keep registry/history intact.
+Standalone `fetch-alpaca --feed sip` remains available for permitted SIP access,
+without automatic fallback or relabeling of cached inputs.
+Operational history retains the feed declared in the authenticated study bundle.
+Existing SIP studies continue to fetch SIP; cached and newly prepared daily bundles
+are checked for feed equality before decisions. Unknown/ambiguous feeds block.
+
 ## Study before operations
 
 The current protocol is [spy-trend-v2](../../studies/spy-trend-v2/PROTOCOL.md), not

@@ -11,5 +11,6 @@ readiness() {
     --holdout "$STUDY_OUTPUT/holdout.json" --registry "$STUDY_REGISTRY")
   [[ -z ${CONFIG:-} ]] || args+=(--planning-config "$CONFIG")
   [[ -z ${1:-} ]] || args+=(--config-out "$1")
-  "$PYTHON" -m quant_session.readiness "${args[@]}"
+  (( $# == 0 )) || shift
+  "$PYTHON" -m quant_session.readiness "${args[@]}" "$@"
 }

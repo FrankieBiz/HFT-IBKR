@@ -1,4 +1,4 @@
-"""Free Alpaca source for raw daily SPY bars, cash dividends and the exchange calendar.
+"""Alpaca source for raw daily SPY bars, cash dividends and the exchange calendar.
 
 Produces the four declared inputs that `quant_data prepare` accepts. Every request goes
 through an injected `get(url) -> bytes`, so tests stay offline. The default transport
@@ -36,6 +36,7 @@ CHECK_SESSIONS = 10
 # Tolerance and count for the daily-versus-regular-session cross-check, fixed in advance.
 CHECK_TOLERANCE = Decimal('0.001')
 CHECK_MAX_FLAGGED = 2
+FEEDS = {'iex': 'IEX single-exchange', 'sip': 'SIP consolidated'}
 FILES = ('prices.csv', 'distributions.csv', 'calendar.csv', 'metadata.json', 'alpaca-check.json')
 SYSTEM_CA_BUNDLE = '/etc/ssl/cert.pem'
 
@@ -139,9 +140,15 @@ def _bars_extractor(symbol):
     return extract
 
 
-def fetch_bars(get, symbol, start, end, timeframe='1Day'):
+def _validate_feed(feed):
+    if not isinstance(feed, str) or feed not in FEEDS:
+        raise InputError('feed must be iex or sip')
+
+
+def fetch_bars(get, symbol, start, end, timeframe='1Day', *, feed='iex'):
+    _validate_feed(feed)
     params = {'symbols': symbol, 'timeframe': timeframe, 'start': start, 'end': end,
-              'adjustment': 'raw', 'feed': 'sip', 'limit': 10000, 'sort': 'asc'}
+              'adjustment': 'raw', 'feed': feed, 'limit': 10000, 'sort': 'asc'}
     return _paged(get, DATA_URL, '/v2/stocks/bars', params, _bars_extractor(symbol))
 
 
@@ -249,8 +256,9 @@ def issuer_pay_date(ex):
     return pay
 
 
-def build_inputs(bars, dividends, calendar, *, start, end, retrieved, check=None):
+def build_inputs(bars, dividends, calendar, *, start, end, retrieved, check=None, feed='iex'):
     """Validate fetched records and render the declared intake files as bytes."""
+    _validate_feed(feed)
     sessions = _calendar_sessions(calendar, start, end)
     days = [day for day, _, _ in sessions]
     rows = []
@@ -341,15 +349,18 @@ def build_inputs(bars, dividends, calendar, *, start, end, retrieved, check=None
         'schema_version': 1, 'symbol': 'SPY', 'currency': 'USD', 'kind': 'historical',
         'price_policy': 'raw_unadjusted', 'corporate_actions': 'complete_dividends_no_splits',
         'splits_in_interval': False,
-        'review_note': ('Alpaca free-plan SIP daily bars (adjustment=raw), cash dividends from '
+        'review_note': (f'Alpaca {FEEDS[feed]} daily bars (adjustment=raw), cash dividends from '
                         'Alpaca corporate actions and the Alpaca trading calendar, ' + window + '. '
                         'Quarterly dividend coverage and bar/calendar equality were checked; a '
                         'daily-versus-regular-session minute-bar cross-check is in alpaca-check.json. '
                         'No split is declared because SPY has not split, per public split histories; '
-                        'not independently verified against exchange official records.' + pay_note),
+                       'not independently verified against exchange official records.'
+                       + (' IEX prices and volume cover one exchange, not the consolidated market; '
+                          'the sampled minute cross-check does not verify official auction prices.'
+                          if feed == 'iex' else '') + pay_note),
         'sources': {
             'prices': {'name': 'Alpaca Market Data API v2 daily bars',
-                       'reference': f'{DATA_URL}/v2/stocks/bars symbols=SPY timeframe=1Day adjustment=raw feed=sip; {window}',
+                       'reference': f'{DATA_URL}/v2/stocks/bars symbols=SPY timeframe=1Day adjustment=raw feed={feed}; {window}',
                        'license_reference': TERMS, 'retrieved_at': retrieved['prices']},
             'distributions': {'name': 'Alpaca Market Data API v1 corporate actions (cash_dividend)',
                               'reference': f'{DATA_URL}/v1/corporate-actions symbols=SPY types=cash_dividend; {window}',
@@ -369,13 +380,14 @@ def check_sessions(days, count=CHECK_SESSIONS):
     return [days[round(i * (len(days) - 1) / (count - 1))] for i in range(count)]
 
 
-def cross_check(get, bars, calendar, *, start, end):
+def cross_check(get, bars, calendar, *, start, end, feed='iex'):
     """Compare daily bars with regular-session minute bars on fixed sample sessions.
 
     Daily bars that silently included pre- or post-market trades would usually open or
     range away from the regular session. More than CHECK_MAX_FLAGGED sessions beyond
     CHECK_TOLERANCE fails the fetch.
     """
+    _validate_feed(feed)
     sessions = {day: (opening, closing) for day, opening, closing in _calendar_sessions(calendar, start, end)}
     daily = {}
     for bar in bars:
@@ -388,7 +400,8 @@ def cross_check(get, bars, calendar, *, start, end):
         open_at = datetime.fromisoformat(f'{day.isoformat()}T{opening}:00').replace(tzinfo=NEW_YORK)
         close_at = datetime.fromisoformat(f'{day.isoformat()}T{closing}:00').replace(tzinfo=NEW_YORK)
         minutes = [bar for bar in fetch_bars(get, 'SPY', open_at.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z'),
-                                             close_at.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z'), '1Min')
+                                             close_at.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z'),
+                                             '1Min', feed=feed)
                    if open_at <= _bar_session(bar, daily=False) < close_at]
         if not minutes or day not in daily:
             results.append({'session': day.isoformat(), 'flagged': True, 'reason': 'missing bars'})
@@ -404,7 +417,7 @@ def cross_check(get, bars, calendar, *, start, end):
         results.append({'session': day.isoformat(), 'flagged': max(gaps.values()) > CHECK_TOLERANCE,
                         **{name: format(value, '.6f') for name, value in gaps.items()}})
     flagged = sum(item['flagged'] for item in results)
-    report = {'schema_version': 1, 'tolerance': format(CHECK_TOLERANCE, 'f'),
+    report = {'schema_version': 1, 'feed': feed, 'tolerance': format(CHECK_TOLERANCE, 'f'),
               'max_flagged': CHECK_MAX_FLAGGED, 'flagged': flagged, 'sessions': results}
     if flagged > CHECK_MAX_FLAGGED:
         raise InputError(f'daily bars disagree with regular-session minute bars on {flagged} '
@@ -412,8 +425,9 @@ def cross_check(get, bars, calendar, *, start, end):
     return report
 
 
-def fetch_inputs(get, start, end, *, clock=None):
+def fetch_inputs(get, start, end, *, clock=None, feed='iex'):
     """Fetch, cross-check and render intake inputs for [start, end] inclusive."""
+    _validate_feed(feed)
     clock = clock or (lambda: datetime.now(timezone.utc))
     if not isinstance(start, date) or not isinstance(end, date) or start >= end:
         raise InputError('start must precede end')
@@ -423,13 +437,14 @@ def fetch_inputs(get, start, end, *, clock=None):
     retrieved['calendar'] = stamp()
     # A bare end date may mean midnight UTC, before the final bar's 04:00Z/05:00Z label;
     # request one extra day and filter by session date instead.
-    bars = fetch_bars(get, 'SPY', start.isoformat(), (end + timedelta(days=1)).isoformat())
+    bars = fetch_bars(get, 'SPY', start.isoformat(), (end + timedelta(days=1)).isoformat(), feed=feed)
     retrieved['prices'] = stamp()
     dividends = fetch_dividends(get, 'SPY', (start - timedelta(days=31)).isoformat(),
                                 (end + timedelta(days=31)).isoformat())
     retrieved['distributions'] = stamp()
-    check = cross_check(get, bars, calendar, start=start, end=end)
-    return build_inputs(bars, dividends, calendar, start=start, end=end, retrieved=retrieved, check=check)
+    check = cross_check(get, bars, calendar, start=start, end=end, feed=feed)
+    return build_inputs(bars, dividends, calendar, start=start, end=end, retrieved=retrieved,
+                        check=check, feed=feed)
 
 
 def _check_destination(folder):

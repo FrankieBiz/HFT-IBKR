@@ -21,18 +21,20 @@ def main(argv=None):
     inspect = commands.add_parser('inspect', help='Validate bundle and export its coverage/provenance report.')
     inspect.add_argument('--bundle', type=Path, required=True)
     inspect.add_argument('--output', type=Path, required=True)
-    fetch = commands.add_parser('fetch-alpaca', help='Download raw daily SPY inputs from the free Alpaca API '
+    fetch = commands.add_parser('fetch-alpaca', help='Download raw daily SPY inputs from Alpaca '
                                 '(keys from APCA_API_KEY_ID / APCA_API_SECRET_KEY).')
     fetch.add_argument('--start', required=True, help='YYYY-MM-DD, first calendar date requested')
     fetch.add_argument('--end', required=True, help='YYYY-MM-DD, last completed session; must be before today (UTC)')
     fetch.add_argument('--output-dir', type=Path, required=True)
+    fetch.add_argument('--feed', choices=('iex', 'sip'), default='iex',
+                       help='Price feed: iex (default, single exchange); sip requires permitted access.')
     args = parser.parse_args(argv)
     try:
         if args.command == 'fetch-alpaca':
             start, end = iso_date(args.start, 'start'), iso_date(args.end, 'end')
             if end >= datetime.now(timezone.utc).date():
                 raise InputError('end must be a completed session before today (UTC)')
-            files = fetch_inputs(environment_transport(), start, end)
+            files = fetch_inputs(environment_transport(), start, end, feed=args.feed)
             write_inputs(args.output_dir, files)
             print(f'Wrote Alpaca intake inputs: {args.output_dir}; not for redistribution. '
                   'Next: quant_data prepare.')

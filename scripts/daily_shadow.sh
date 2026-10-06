@@ -9,7 +9,7 @@ PORTFOLIO=${PORTFOLIO:-.research-output/shadow/portfolio.json}
 ROOT=.research-output/shadow
 source scripts/shadow_common.sh
 # This must precede credential reads, downloads and cached-plan presentation.
-readiness >/dev/null
+PRICE_FEED=$(readiness "" --feed-only)
 
 read -r TODAY YESTERDAY < <("$PYTHON" -c '
 from datetime import datetime, timedelta
@@ -20,6 +20,9 @@ DAY=$ROOT/$TODAY
 mkdir -p "$DAY"
 readiness "$DAY/config.json" >/dev/null
 [[ -n $CONFIG ]] || CONFIG=$DAY/config.json
+if [[ -f $DAY/spy.qdata ]]; then
+  readiness "" --daily-bundle "$DAY/spy.qdata" >/dev/null
+fi
 
 summary() {
   "$PYTHON" - "$DAY/plan.json" "$CONFIG" "$ROOT/ledger.sqlite" "$TODAY" <<'PY'
@@ -55,6 +58,7 @@ PY
 }
 
 if [[ -f $DAY/plan.json ]]; then
+  readiness "" --daily-bundle "$DAY/spy.qdata" >/dev/null
   summary
   echo "Already recorded for $TODAY (one frozen decision per session)."
   exit 0
@@ -72,10 +76,11 @@ set -a
 # shellcheck disable=SC1090
 . "$ALPACA_ENV"
 set +a
-[[ -d $DAY/alpaca ]] || "$PYTHON" -m quant_data fetch-alpaca --start 2016-01-01 --end "$YESTERDAY" --output-dir "$DAY/alpaca"
+[[ -d $DAY/alpaca ]] || "$PYTHON" -m quant_data fetch-alpaca --start 2016-01-01 --end "$YESTERDAY" --output-dir "$DAY/alpaca" --feed "$PRICE_FEED"
 [[ -f $DAY/spy.qdata ]] || "$PYTHON" -m quant_data prepare --prices "$DAY/alpaca/prices.csv" \
   --distributions "$DAY/alpaca/distributions.csv" --calendar "$DAY/alpaca/calendar.csv" \
   --metadata "$DAY/alpaca/metadata.json" --output "$DAY/spy.qdata"
+readiness "" --daily-bundle "$DAY/spy.qdata" >/dev/null
 rm -f "$DAY/schedule.json" "$DAY/snapshot.json"
 "$PYTHON" -m quant_session live-inputs --bundle "$DAY/spy.qdata" --portfolio "$PORTFOLIO" \
   --schedule-out "$DAY/schedule.json" --snapshot-out "$DAY/snapshot.json"

@@ -95,8 +95,68 @@ class AlpacaSourceTests(unittest.TestCase):
         self.assertEqual(dataset.manifest['kind'], 'historical')
         self.assertEqual(check['flagged'], 0)
         daily = next(url for url in fake.urls if 'timeframe=1Day' in url)
-        for part in ('adjustment=raw', 'feed=sip', 'start=2024-03-11', 'end=2024-03-23'):
+        for part in ('adjustment=raw', 'feed=iex', 'start=2024-03-11', 'end=2024-03-23'):
             self.assertIn(part, daily)
+
+    def test_default_intake_works_when_subscription_denies_sip(self):
+        fake = FakeAlpaca(page_size=3)
+
+        def basic_account(url):
+            query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))
+            if query.get('feed') == 'sip':
+                raise InputError('Alpaca HTTP 403: subscription does not permit querying recent SIP data')
+            return fake(url)
+
+        files = fetched(basic_account)
+        metadata = json.loads(files['metadata.json'])
+        self.assertIn('feed=iex', metadata['sources']['prices']['reference'])
+        self.assertIn('single-exchange', metadata['review_note'])
+        self.assertNotIn('SIP', metadata['review_note'])
+        self.assertEqual(json.loads(files['alpaca-check.json'])['feed'], 'iex')
+        self.assertTrue(all('feed=iex' in url for url in fake.urls if '/stocks/bars?' in url))
+        self.assertGreater(sum('timeframe=1Day' in url for url in fake.urls), 1)
+
+    def test_explicit_sip_is_used_for_daily_minute_and_provenance(self):
+        fake = FakeAlpaca()
+        files = alpaca.fetch_inputs(fake, START, END, clock=CLOCK, feed='sip')
+        self.assertTrue(all('feed=sip' in url for url in fake.urls if '/stocks/bars?' in url))
+        metadata = json.loads(files['metadata.json'])
+        self.assertIn('feed=sip', metadata['sources']['prices']['reference'])
+        self.assertIn('SIP', metadata['review_note'])
+        self.assertNotIn('free-plan SIP', metadata['review_note'])
+        self.assertEqual(json.loads(files['alpaca-check.json'])['feed'], 'sip')
+
+    def test_unknown_feed_fails_before_any_request(self):
+        fake = FakeAlpaca()
+        with self.assertRaisesRegex(InputError, 'feed'):
+            alpaca.fetch_inputs(fake, START, END, clock=CLOCK, feed='auto')
+        self.assertEqual(fake.urls, [])
+
+    def test_explicit_sip_denial_never_silently_switches_feed(self):
+        fake = FakeAlpaca()
+        requests = []
+
+        def denied_sip(url):
+            requests.append(url)
+            if '/stocks/bars?' in url:
+                raise InputError('Alpaca HTTP 403: subscription does not permit querying recent SIP data')
+            return fake(url)
+
+        with self.assertRaisesRegex(InputError, 'HTTP 403'):
+            alpaca.fetch_inputs(denied_sip, START, END, clock=CLOCK, feed='sip')
+        self.assertEqual(sum('/stocks/bars?' in url for url in requests), 1)
+        self.assertFalse(any('feed=iex' in url for url in requests))
+
+    def test_cli_propagates_default_and_explicit_feed(self):
+        for arguments, expected in (([], 'iex'), (['--feed', 'sip'], 'sip')):
+            fake = FakeAlpaca()
+            with self.subTest(feed=expected), tempfile.TemporaryDirectory() as tmp, \
+                    patch('quant_data.__main__.environment_transport', return_value=fake):
+                folder = Path(tmp) / 'alpaca'
+                self.assertEqual(main(['fetch-alpaca', '--start', str(START), '--end', str(END),
+                                       '--output-dir', str(folder), *arguments]), 0)
+                metadata = json.loads((folder / 'metadata.json').read_text())
+                self.assertIn('feed=' + expected, metadata['sources']['prices']['reference'])
 
     def test_pages_are_followed_until_the_token_ends(self):
         fake = FakeAlpaca(page_size=3)
