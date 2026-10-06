@@ -37,7 +37,8 @@ before their scripts run. Linux zombie handling uses invented `/proc` fixtures.
 ## Limits of the evidence
 
 The actual process/browser runs were on macOS with Python 3.14 and Chromium.
-Python 3.11/3.14 Ubuntu CI is configured separately. A real Windows/WSL desktop
+Ubuntu GitHub Actions also passed `make check build demo` on Python 3.11 and
+3.14 for app source commit `5569920`: [workflow run](https://github.com/FrankieBiz/HFT-IBKR/actions/runs/37532866344). A real Windows/WSL desktop
 was not available locally, so the Windows launcher/browser handoff was reviewed
 but not exercised on that host. Provider subscription behavior and authenticated
 connection still need the operator's explicit connection check on their computer.
