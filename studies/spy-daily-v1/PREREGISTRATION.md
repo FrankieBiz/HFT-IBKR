@@ -52,6 +52,20 @@ Alpaca-provided pay date: any disagreement stops the intake. The derivation and 
 number of dates checked are recorded in the bundle's `review_note`. The pay date only
 sets when a dividend's cash reaches the portfolio, about one month after the ex-date.
 
+The second retrieval attempt then stopped at the quarterly-dividend completeness check:
+Alpaca's feed (41 of 43 quarterly SPY dividends) has no record at all for **2016-03** and
+**2018-06**. Both real dividends are added from published records: ex-date 2016-03-18,
+$1.05 per share, paid 2016-04-29; ex-date 2018-06-15, $1.246 per share, paid 2018-07-31.
+Amounts come from Yahoo Finance's dividend export, which publishes 3 decimals (the
+error is at most $0.0005 per share, a few cents on the $50,000 shadow book), and agree
+with a second aggregator; both ex-dates are the third Friday and both pay dates follow
+the issuer schedule above. The same export matches Alpaca's own amounts for six
+neighbouring quarters to its 3 decimals. The supplement applies only when Alpaca has no
+dividend at all in that month; Alpaca's record always wins, any other missing quarter
+still stops the intake, and the note in `review_note` names every supplemented month.
+Dropping 2016-2018 instead would have changed the pre-registered range and so made a new
+study. Still no bundle, validation run or holdout run exists, and no price data was inspected.
+
 ## Protocol
 
 | Field | Value |

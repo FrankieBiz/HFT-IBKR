@@ -172,6 +172,35 @@ class AlpacaSourceTests(unittest.TestCase):
         with self.assertRaisesRegex(InputError, 'dividend payable_date'):
             fetched(FakeAlpaca(dividends=[garbage]))
 
+    def test_supplement_lists_only_genuine_quarterly_ex_dates_with_sourced_amounts(self):
+        self.assertEqual(sorted(alpaca.DIVIDEND_SUPPLEMENT), [date(2016, 3, 18), date(2018, 6, 15)])
+        for ex, amount in alpaca.DIVIDEND_SUPPLEMENT.items():
+            self.assertEqual(ex, alpaca._third_friday(ex.year, ex.month))  # issuer's ex-date schedule
+            self.assertTrue(Decimal('1') < amount < Decimal('1.3'))
+        self.assertEqual(alpaca.issuer_pay_date(date(2016, 3, 18)), date(2016, 4, 29))  # as published
+        self.assertEqual(alpaca.issuer_pay_date(date(2018, 6, 15)), date(2018, 7, 31))  # as published
+
+    def test_dividend_missing_from_alpaca_is_supplemented_and_disclosed(self):
+        with patch.object(alpaca, 'DIVIDEND_SUPPLEMENT', {date(2024, 3, 15): Decimal('1.5')}):
+            files = fetched(FakeAlpaca(dividends=[]))
+        self.assertIn('2024-03-15,1.5,2024-04-30\n', files['distributions.csv'].decode())
+        note = json.loads(files['metadata.json'])['review_note']
+        self.assertIn('no dividend for 2024-03', note)
+        self.assertIn('published to 3 decimals', note)
+
+    def test_alpaca_dividend_always_wins_over_the_supplement(self):
+        with patch.object(alpaca, 'DIVIDEND_SUPPLEMENT', {date(2024, 3, 15): Decimal('9.99')}):
+            files = fetched(FakeAlpaca())
+        csv_text = files['distributions.csv'].decode()
+        self.assertIn('2024-03-15,1.5949,2024-04-30\n', csv_text)
+        self.assertNotIn('9.99', csv_text)
+        self.assertNotIn('no dividend for', json.loads(files['metadata.json'])['review_note'])
+
+    def test_supplement_never_covers_other_missing_quarters(self):
+        with patch.object(alpaca, 'DIVIDEND_SUPPLEMENT', {date(2016, 3, 18): Decimal('1.05')}):
+            with self.assertRaisesRegex(InputError, r"dividend history incomplete.*2024-03"):
+                fetched(FakeAlpaca(dividends=[]))
+
     def test_daily_bars_disagreeing_with_regular_session_fail_closed(self):
         tolerated = {day: '501.00' for day in SESSIONS[:2]}  # 0.18% away on two sessions
         files = fetched(FakeAlpaca(minute_open=tolerated))

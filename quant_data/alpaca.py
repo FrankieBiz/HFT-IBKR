@@ -221,6 +221,18 @@ def _third_friday(year, month):
     return first + timedelta(days=(4 - first.weekday()) % 7 + 14)
 
 
+# SPY cash dividends that Alpaca's corporate-actions feed omits entirely (checked 2026-10-05
+# against the feed for 2015-12-01..2026-11-02: 41 of the 43 quarterly dividends were present).
+# Amounts are per share as published by Yahoo Finance's dividend export (3 decimals; the
+# error is at most 0.0005 per share) and agree with a second aggregator. Ex-dates are the
+# third Friday of the month, per the issuer schedule. They apply only when Alpaca has no
+# dividend at all in that month; Alpaca's own record always wins.
+DIVIDEND_SUPPLEMENT = {
+    date(2016, 3, 18): Decimal('1.05'),
+    date(2018, 6, 15): Decimal('1.246'),
+}
+
+
 def issuer_pay_date(ex):
     """SPY's pay date for a quarterly ex-date: the last weekday of the following month.
 
@@ -279,7 +291,18 @@ def build_inputs(bars, dividends, calendar, *, start, end, retrieved, check=None
         if ex in distributions:
             raise InputError(f'{ex}: multiple cash dividends share an ex-date')
         distributions[ex] = (_decimal(item.get('rate'), 'dividend rate'), pay)
+    supplemented = [ex for ex in sorted(DIVIDEND_SUPPLEMENT) if first < ex <= last
+                    and not any(have.year == ex.year and have.month == ex.month for have in distributions)]
+    for ex in supplemented:
+        distributions[ex] = (DIVIDEND_SUPPLEMENT[ex], issuer_pay_date(ex))
     pay_note = ''
+    if supplemented:
+        months = ', '.join(f'{ex.year}-{ex.month:02d}' for ex in supplemented)
+        pay_note += (f' Alpaca had no dividend for {months}; the real SPY dividends were added from '
+                     'published records (per-share amounts published to 3 decimals by Yahoo Finance and '
+                     'a second aggregator, ' + ', '.join(f'{ex.isoformat()} {DIVIDEND_SUPPLEMENT[ex]}'
+                                                         for ex in supplemented)
+                     + '; pay dates from the issuer schedule).')
     if derived:
         # Alpaca's own dates are the only independent check on the derived ones.
         checkable = [(ex, pay) for ex, pay in provided if ex.month in (3, 6, 9, 12)]
@@ -287,7 +310,7 @@ def build_inputs(bars, dividends, calendar, *, start, end, retrieved, check=None
         if disagree:
             raise InputError(f'Alpaca pay dates disagree with the issuer schedule on {disagree[:3]}; '
                              'refusing to derive the missing ones')
-        pay_note = (f' Alpaca omitted payable_date for {len(derived)} dividend(s) with ex-dates '
+        pay_note += (f' Alpaca omitted payable_date for {len(derived)} dividend(s) with ex-dates '
                     f'{min(derived).isoformat()} to {max(derived).isoformat()}; these were derived as the '
                     'last weekday of the month after the ex-date, per the SPDR S&P 500 ETF Trust prospectus '
                     '(SEC filing dated 2019-01-17); '
