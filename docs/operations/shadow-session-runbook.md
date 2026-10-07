@@ -1,9 +1,10 @@
 # Daily shadow decision rehearsal
 
-The delivery decision is **no complete rewrite**. Preserve the tested foundations
-and prioritize an integrated daily shadow/paper workflow. SPY trend is an unproven
-benchmark. Laya, HFT targets and framework replacement are outside the critical path.
-See the [dated decision](../research/2026-10-04-pivot-and-delivery-decision.md).
+The current direction is the [bounded daily trend overlay](../../README.md),
+with the original signal and stronger evidence/risk/health controls. SPY trend is
+unproven. HFT, AI and framework migration remain deferred. This page describes
+explicit offline rehearsals; operational scripts additionally enforce study
+readiness before accessing keys/services or printing cached proposals.
 
 ## What this command does
 
@@ -80,20 +81,25 @@ Buys reference ask; sells reference bid. The existing research half-spread term 
 zeroed because the quote already expresses spread. Slippage, impact and fees remain
 illustrative estimates. Settled cash funds buys. Conservative effective NAV is the
 minimum of declared NAV and the synthetic cash-plus-bid-marked inventory value;
-peak NAV determines the declared drawdown gate. These marks omit unpaid dividends
+declared and ledger-observed peak NAV determine the drawdown entry gate. These marks omit unpaid dividends
 and other assets and cannot be treated as a real broker balance sheet.
 
-The ledger freezes one decision per SIM/SPY/execution-session, including blocked
+The ledger serializes planning, observed peak/latched entry-risk memory and one
+decision per SIM/SPY/execution-session, including blocked
 results. An identical retry in a fresh output file recovers the same canonical report
 without a second row. If output publication fails after the transaction committed,
 retry identical inputs with a valid fresh destination. Changed inputs conflict;
-they never replace the stored decision. Independent rehearsal cases need independent
+they never replace the stored decision. New sessions must be chronological. An
+edited lower peak or recovery cannot clear an observed breach. Valid NAV marks
+still update risk memory during a manual trading halt; stale/invalid marks do not.
+Legacy ledgers lacking memory block new sessions pending reviewed migration.
+Independent rehearsal cases need independent
 ledgers. Do not delete/reset a ledger to bypass a conflict in an operational workflow.
 
 This is a local audit/idempotency guard, not order reservation, fill accounting,
 tamper-resistant storage or an adaptive intraday journal. A declared halt blocks all
 proposals. A drawdown breach blocks entries but still proposes signal-driven exits,
-matching the backtest's buy-only halt. Neither liquidates inventory or guarantees a
+matching the backtest's latched buy-only halt. Neither liquidates inventory or guarantees a
 maximum loss. Full exits
 can be blocked by capacity/notional limits; partial exit policy is not implemented.
 

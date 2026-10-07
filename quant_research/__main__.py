@@ -15,6 +15,7 @@ from .config import parse_config
 from .data import load_dataset
 from .evaluation import parse_protocol, evaluate_registered, freeze_selection, release_holdout
 from .experiments import ExperimentRegistry
+from .robustness import run_robustness
 from .serde import InputError, canonical_json, durable_sync, iso_date, read_json_document
 
 ASSUMPTIONS = [
@@ -74,6 +75,15 @@ def main(argv=None):
     replay.add_argument('--config', required=True, type=Path)
     replay.add_argument('--evaluation-start', help='YYYY-MM-DD; default first session after lookback warmup')
     replay.add_argument('--output', required=True, type=Path)
+    robustness = subparsers.add_parser('robustness', help='Offline walk-forward and paired moving-block diagnostics; excludes final holdout.')
+    for field in ('data', 'manifest', 'bundle'):
+        robustness.add_argument('--' + field, type=Path)
+    for field in ('config', 'protocol', 'output'):
+        robustness.add_argument('--' + field, required=True, type=Path)
+    for field, default in (('train-sessions', 252), ('test-sessions', 63),
+                           ('embargo-sessions', None), ('folds', None),
+                           ('block-size', 20), ('samples', 500), ('seed', 0)):
+        robustness.add_argument('--' + field, type=int, default=default)
     for command in ('evaluate', 'holdout'):
         operation = subparsers.add_parser(command, help='Offline chronological '+command)
         for field in ('data','manifest','bundle'):
@@ -130,6 +140,12 @@ def main(argv=None):
             'data_sha256': dataset.data_sha256, 'manifest_sha256': dataset.manifest_sha256,
             'provenance': dataset.manifest, 'assumptions': ASSUMPTIONS,
             })
+        elif args.command == 'robustness':
+            protocol = parse_protocol(read_json_document(args.protocol)[0], dataset)
+            report = run_robustness(dataset, config, protocol, source_identity()['source_sha256'],
+                                    **{field: getattr(args, field) for field in (
+                                        'train_sessions', 'test_sessions', 'embargo_sessions',
+                                        'folds', 'block_size', 'samples', 'seed')})
         else:
             protocol=parse_protocol(read_json_document(args.protocol)[0],dataset)
             code=source_identity()['source_sha256']

@@ -13,7 +13,7 @@ LIMITATIONS = [
     'Portfolio, reconciliation and schedule are declarations, not broker-verified; a live IEX quote is one venue, not the NBBO.',
     'Historical source declarations remain unreviewed; schedule is not exchange-certified.',
     'Effective NAV excludes unpaid dividends and other assets; no broker balance-sheet equivalence.',
-    'A declared halt blocks every proposal; a drawdown breach blocks entries only, as in the backtest.',
+    'A declared halt blocks every proposal; ledger-backed drawdown memory latches entry halts across restarts.',
     'Neither forces liquidation or partial exits.',
     'One frozen decision per session is not order reservation or an adaptive execution journal.',
 ]
@@ -25,11 +25,14 @@ def decision_digest(report):
 
 
 @fixed_decimal
-def plan_session(dataset, config, schedule, snapshot, source_hashes=None):
+def plan_session(dataset, config, schedule, snapshot, source_hashes=None, risk_memory=None):
     quote, portfolio, policy = snapshot['quote'], snapshot['portfolio'], snapshot['policy']
     now = snapshot['now']
     effective_nav = min(portfolio['nav'], portfolio['cash'] + portfolio['shares'] * quote['bid'])
-    drawdown = (portfolio['peak_nav'] - effective_nav) / portfolio['peak_nav']
+    previous_risk = risk_memory or {'peak_nav': Decimal(0), 'maximum_drawdown': Decimal(0),
+                                    'entry_halted': False, 'previous_session': None}
+    peak = max(portfolio['peak_nav'], previous_risk['peak_nav'], effective_nav)
+    drawdown = (peak - effective_nav) / peak
     input_digest = hashlib.sha256(canonical_json({
         'config':asdict(config), 'schedule':schedule, 'snapshot':snapshot}).encode()).hexdigest()
     report = {'schema_version':1, 'mode':'offline_shadow', 'account':'SIM','symbol':'SPY','currency':'USD',
@@ -83,11 +86,28 @@ def plan_session(dataset, config, schedule, snapshot, source_hashes=None):
             (effective_nav == 0,'ZERO_EFFECTIVE_NAV')]:
         if condition:
             blockers.append(reason)
+    # Invalid marks must not permanently poison the observed peak or latch.
+    invalid_marks = {'STALE_QUOTE', 'FUTURE_QUOTE', 'STALE_ACCOUNT', 'FUTURE_ACCOUNT',
+                     'UNRECONCILED', 'PENDING_ORDERS', 'UNCERTAIN_ORDERS', 'ZERO_EFFECTIVE_NAV',
+                     'OUTSIDE_EXECUTION_WINDOW', 'QUOTE_BEFORE_OPEN', 'MISSING_EXECUTION_SESSION'}
+    # A manual trading halt or missing strategy history does not invalidate a
+    # fresh, reconciled portfolio mark. Losses must still latch during a halt.
+    mark_valid = not invalid_marks.intersection(blockers)
+    maximum_drawdown = previous_risk['maximum_drawdown']
+    entry_halted = previous_risk['entry_halted']
+    if mark_valid:
+        maximum_drawdown = max(maximum_drawdown, drawdown)
+        entry_halted = entry_halted or maximum_drawdown >= config.max_drawdown
+    report['risk_memory'] = {
+        'peak_nav': peak if mark_valid else previous_risk['peak_nav'],
+        'maximum_drawdown': maximum_drawdown, 'entry_halted': entry_halted,
+        'mark_valid': mark_valid, 'previous_session': previous_risk['previous_session'],
+    }
     if not blockers:
         side = ('BUY' if report['signal']=='LONG' and portfolio['shares']==0 else
                 'SELL' if report['signal']=='CASH' and portfolio['shares']>0 else None)
         # Like the backtest's drawdown halt, a breach stops new exposure but never an exit.
-        if side == 'BUY' and drawdown >= config.max_drawdown:
+        if side == 'BUY' and entry_halted:
             blockers.append('DRAWDOWN_LIMIT')
         elif side is None:
             report['status'] = 'HOLD'

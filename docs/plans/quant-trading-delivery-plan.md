@@ -1,17 +1,27 @@
 # Quant trading delivery plan
 
-Updated 2026-10-05. This document records the implemented software and its control
-contracts. The [HFT edge research plan](hft-edge-research-plan.md) is authoritative
-for current research priorities and supersedes conflicting sequencing below. Both
-supersede the [historical proposal](optimize-quant-trading-system.md).
-Broker facts and unresolved claims are recorded in the
-[assumption review](../research/2026-10-04-broker-assumptions.md).
-The user's RTX 3070 Ti / 32 GB RAM target and local Laya choice are assessed in the
-[hardware and trading-stack decision](../research/2026-10-04-laya-hardware-and-trading-stack.md).
-The [October 5 research decision](../research/2026-10-05-hft-research-decision.md)
-replaces the daily-first priority: validate a bounded intraday order-flow hypothesis
-after data/economic feasibility. Daily research remains a benchmark. Local AI,
-framework replacement and further broker features are outside the immediate critical path.
+Updated 2026-10-07. **Current direction: a bounded daily SPY trend overlay, with
+research evidence and durable entry-risk controls before operational shadowing.**
+The [October 6 design](../superpowers/specs/2026-10-06-robust-trend-design.md) and
+[implementation plan](../superpowers/plans/2026-10-06-robust-trend.md) supersede
+earlier sequencing. The HFT/order-flow branch is closed; AI, framework migration,
+crypto/FX, grid and DCA remain deferred until incremental economic evidence exists.
+The original proposal and earlier research decisions remain historical context.
+
+The [October 7 reliability scope](../superpowers/specs/2026-10-07-reliability.md)
+preserves frozen research/config/protocol identities and existing history. It
+repairs quote/NAV inputs, app eligibility/health reporting, bounded daily retries
+and interrupted publication recovery, and exposes verified strategy evidence.
+Study display verification is content cached; operational gates remain fresh.
+Maintenance is on demand whenever requested, with tested commits, GitHub pushes
+and documentation updates; no unattended maintenance schedule is installed.
+
+The revised [spy-trend-v2 protocol](../../studies/spy-trend-v2/PROTOCOL.md) uses a
+25% entry target, 30% entry exposure cap and 10% drawdown halt on new buys. These
+are research sleeve assumptions, not loss guarantees or personalized allocation.
+V1 remains unchanged. V2 shares v1's registry: consumed final sessions cannot be
+reused. Historical source/config/protocol/freeze/registry/code verification and the
+verdict are mandatory before daily operator scripts access keys or services.
 
 ## Objective and boundaries
 
@@ -42,6 +52,9 @@ accepts only `simulation`; all other modes fail configuration validation.
 | F1: framework compatibility study | Pinned NautilusTrader offline replay and IBKR adapter design; ib_async fallback if necessary | P&L equivalence, version-matched API/docs, A01–A14 mapped to adapter behavior, license/dependency review | Planned; no framework adopted for operational use |
 | V1: offline results view | Self-contained chart/cost/provenance/control snapshot dashboard | Automated report rendering, keyboard/mobile browser checks, loopback route restrictions | Implemented and opened locally; read-only offline snapshot |
 | S1: integrated shadow session | Causal completed-session signal, explicit synthetic quote/portfolio, independent admission and durable decision ledger | Buy/hold/sell/blocked rehearsal, exact retry, conflict/corruption/causality tests, portable CLI | Implemented offline; 178 total tests and full synthetic demo pass; no order authority |
+| R2: bounded trend robustness | Separate v2 sleeve protocol, causal walk-forward selection and paired block-resampling diagnostics | Holdout metrics excluded; deterministic paired samples and cost stress | Software implemented; historical economic evidence outstanding |
+| S2: enforced evidence and durable risk | Authenticated historical readiness before operator scripts; serialized ledger peak/entry-halt memory | Gate bypass, restart, manual-halt loss marking, corruption and exact-retry regressions | Software implemented; no broker order authority |
+| O1: local health | Short-interval heartbeat and independent offline deadline checker | Missed decisions/failed process checks | Software implemented; independent scheduler and alert delivery not installed |
 | M4: paper adapter | Account-scoped adapter, pacing scheduler, durable journal, operator runbook | Authorized paper tests including reconnect, uncertain submission and cancel/fill races | Not started; requires separate authorization for account actions |
 | M5: live readiness review | Instrument-specific risk policy, regulatory applicability review, operational drills and budget | Reviewed evidence and explicit live authorization | Not started; no live path authorized |
 
@@ -49,8 +62,8 @@ M2 needs reviewed historical inputs and calibrated assumptions. The M3 implement
 plan is [chronological evaluation](../superpowers/plans/2026-10-04-chronological-evaluation.md). The initial research
 choice is SPY, daily 200-session trend-following, with long-or-cash positioning;
 [R1 design](../superpowers/specs/2026-10-04-etf-trend-research-design.md) records
-the decision and limitations. Capital allocation and production limits remain
-unselected. Reviewed historical strategy evaluation and a separate broker-adapter design
+the decision and limitations. The revised research sleeve policy is explicit;
+production limits remain unselected. Reviewed historical evaluation and an adapter design
 remain necessary before account-level paper tests.
 
 An optional standalone [paper Gateway connection diagnostic](../operations/paper-gateway-setup.md)
@@ -61,12 +74,20 @@ unverified. This is setup tooling, not implementation of the M4 paper adapter.
 
 ## Current priority and retained architecture constraints
 
-The next empirical work follows G0-G4 in the [HFT edge research plan](hft-edge-research-plan.md).
-G0 needs licensed event-data semantics, affordable size, actual costs and a justified
-latency envelope. Intraday feature/replay modules are proposed, not implemented.
-Daily M2/M3 remain incomplete and may supply a separate benchmark; they cannot
-validate intraday order-flow signals. Do not treat the implemented S1 daily shadow
-workflow as completion of the HFT objective.
+The next empirical work is reviewed daily data/corporate actions, observed cost
+calibration, v2 walk-forward and paired-block diagnostics, and a qualifying frozen
+historical study followed by prospective shadow observation. If previous studies
+consumed v2's proposed historical holdout, freeze fresh future dates; do not reset
+the registry. Cash yield/taxes matter for a sleeve holding most capital in cash.
+No completed economic study is asserted by this development work.
+
+Ledger-backed planning serializes peak/drawdown entry-halt memory with each frozen
+decision. Restarts, lower declared peaks and NAV recovery cannot clear a breach.
+Economic marks remain eligible during manual trading halts; invalid account/quote
+marks do not update memory. Signal exits remain subject to admission. Legacy
+ledgers require reviewed migration and must be retained. A local heartbeat and
+independent offline checker report operational failures; independent scheduling
+and alert delivery remain operator responsibilities.
 
 Retain the following optional AI/framework architecture constraints if those branches
 are later reopened. They are not the selected next milestones.

@@ -46,6 +46,9 @@ def demo(folder):
         '--output',folder/'recovered-holdout.json')
     if (folder/'holdout.json').read_bytes()!=(folder/'recovered-holdout.json').read_bytes():
         raise RuntimeError('persisted holdout recovery mismatch')
+    run('research','robustness',*bundled,'--protocol',ROOT/'examples/synthetic_protocol.json',
+        '--train-sessions','40','--test-sessions','20','--block-size','5','--samples','50',
+        '--output',folder/'robustness.json')
     run('research','holdout',*evaluation,'--run-id','repeat',
         '--selection',folder/'selection.json','--output',folder/'repeat.json',expected=2)
     for number in range(1,15):
@@ -70,6 +73,7 @@ def demo(folder):
              'data_intake':'prepared_and_inspected','bundled_replay':'financial_results_identical',
              'strategy_validation':'unproven','control_scenarios':14,
              'holdout_repeat':'rejected','holdout_recovery':'byte_identical',
+             'robustness_diagnostics':'development_validation_only',
              'control_replay':'byte_identical','durable_restart':'reconciliation_required',
              'broker_connection':'not_implemented','artifacts':str(folder)}
     summary.update(shadow_workflows(run, ROOT, folder, bundle))

@@ -1,5 +1,10 @@
 # Executable order-flow edge: research and delivery plan
 
+> **Historical/closed plan.** The current implementation direction is the
+> [October 6 daily trend overlay](../superpowers/specs/2026-10-06-robust-trend-design.md)
+> and [spy-trend-v2](../../studies/spy-trend-v2/PROTOCOL.md). Earlier priority
+> statements below are preserved as history, not current implementation scope.
+
 > **Closed for the current account, 2026-10-05.** G0 resolved to *reject this route*.
 > The user's account is IBKR Lite and a cash account, with a $0 data budget.
 >
