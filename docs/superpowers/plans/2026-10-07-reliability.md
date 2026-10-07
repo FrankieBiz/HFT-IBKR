@@ -42,4 +42,4 @@ Files: `README.md`, `SETUP.md`, `docs/plans/quant-trading-delivery-plan.md`, dat
 - [x] Independent specification and quality review; correct substantive findings.
 - [x] Run `make check build demo`, browser fixtures, shell/JS syntax and content comparison proving frozen research/config/protocol unchanged.
 - [x] Document actual behavior, WSL update/start commands, measured fixture performance and remaining evidence limits. No unattended maintenance promise.
-- [ ] Commit only reviewed source/docs; push existing branch and update PR 3 with exact validation. Check CI on the pushed SHA.
+- [x] Commit only reviewed source/docs; push existing branch and update PR 3 with exact validation. Check CI on the pushed SHA. Source commit `7c4b705` passed Ubuntu Python 3.11/3.14 in workflow `37622989070`.

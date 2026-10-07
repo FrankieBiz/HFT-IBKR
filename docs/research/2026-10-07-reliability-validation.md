@@ -45,6 +45,11 @@ setup, manual fills/recovery, owned Start/Stop, corrupt history and no external
 assets or console errors. Independent app/study/input and daily recovery reviews
 found no remaining substantive issues.
 
+Ubuntu GitHub Actions also passed `make check build demo` on Python **3.11 and
+3.14** for source commit `7c4b705`:
+[verified workflow](https://github.com/FrankieBiz/HFT-IBKR/actions/runs/37622989070).
+Both jobs ran the real ownership/shutdown and recovery tests on Linux.
+
 A cProfile comparison of **40 unchanged Service.snapshot calls** on the same
 small invented SIP study fixture measured 0.252171 seconds before and 0.060090
 seconds after, about **4.2x faster**. Full readiness calls fell from 40 to 1.
