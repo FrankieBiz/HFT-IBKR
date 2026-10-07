@@ -26,6 +26,11 @@ Retain `.research-output/`, the shared study registry, portfolio and decision/fi
 ledgers. **Do not rerun your completed study or re-enter existing keys to use the
 app.** The recent-SIP request-window repair is retained; see step 3 if needed.
 If local source edits prevent the fast-forward pull, preserve them before updating.
+This update keeps the frozen research sources/settings unchanged. A decision
+already recorded today still belongs to its original operational source hashes:
+restarting the daily script after an operational-code update can report a cached
+source mismatch for that session. Preserve its files and let the next session
+produce a fresh decision; do not reset history to force a second decision today.
 
 ## Use the app
 
@@ -45,6 +50,16 @@ portfolio. **Download data & run study** contacts the provider only after you cl
 and confirm it. A completed qualified study is reused. **Check data connection**
 and **Start runner** also contact configured services after readiness checks.
 Opening or refreshing the app only reads local state and starts none of these jobs.
+**Check local tools** works without keys, including when a saved key file is
+malformed. Setup shows the verified SMA selection, actual risk/cost settings and
+held-out trend versus matched buy-and-hold results under 1x/2x/5x modeled costs.
+Missing or rejected evidence is shown as needing attention.
+
+Display verification reuses a result only while evidence, research source and
+registry journal/WAL bytes match. Books, accounting and decision history remain
+freshly verified; the runner always performs its own evidence gate. Browser
+polling pauses when its page is hidden and resumes on return. The runner continues
+independently while the app terminal stays open.
 
 The runner records proposals, not fills. In Portfolio, record only the full latest
 verified BUY/SELL with your declared positive fill price and nonnegative fees. The
@@ -57,6 +72,24 @@ journals also block terminal runners before readiness or network calls.
 Buys spend settled cash; sells add unsettled proceeds. Use **Confirm cash settled**
 only when your simulated settlement assumption is satisfied; there is no automatic
 settlement clock. Deposits, withdrawals and partial fills are unsupported.
+If you change settlement or halt state after a decision, its fill form disappears
+with a reason: a fill must still match that decision's original book snapshot.
+
+The continuous runner retries a failed daily decision at most three times, ten
+minutes apart, within the same open market session. Each attempt rechecks the
+calendar and historical evidence. Failure remains visible during the wait; after
+exhaustion it waits for the next session. `./scripts/run_daily.sh --once` fails
+immediately rather than entering the retry loop.
+
+If writing a report was interrupted after its database commit, `daily_shadow.sh`
+restores its exact stored report after checking original inputs, before reading
+intake keys or fetching data. The continuous runner still checks the provider
+calendar to schedule work after authenticating its historical evidence. An explicit
+study run can likewise restore missing validation, registered selection and
+holdout reports from completed stored evidence before reading keys or downloading
+data. It never reopens consumed dates. Reserved/failed runs, missing original
+freezes and divergent files stop for reviewed recovery. Keep all files; do not
+delete the registry to make a rerun possible.
 
 **Halt all proposals** sets the manual global halt and blocks all proposals. The ledger's separate drawdown entry
 latch blocks new buys while permitting eligible signal exits. The app preserves

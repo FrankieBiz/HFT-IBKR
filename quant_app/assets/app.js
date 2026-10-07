@@ -2,6 +2,7 @@
 const $ = id => document.getElementById(id);
 let token = '', state = null, sending = false, polling = false;
 const money = value => value === null || value === undefined ? '—' : new Intl.NumberFormat('en-US', {style:'currency',currency:'USD',maximumFractionDigits:2}).format(Number(value));
+const percent = value => value === null || value === undefined ? '—' : new Intl.NumberFormat('en-US', {style:'percent',maximumFractionDigits:2}).format(Number(value));
 const text = (id,value) => { $(id).textContent = value ?? '—'; };
 const el = (tag,value,cls) => { const node=document.createElement(tag); if(value!==undefined)node.textContent=value; if(cls)node.className=cls; return node; };
 const labels = {runner:'Shadow runner',setup_check:'Data connection check',study:'Historical study',checks:'Local tool check'};
@@ -67,10 +68,19 @@ function render(next){
   text('decision-metric',latest?latest.action:'None yet');text('decision-date',latest?`${latest.session} · shadow proposal`:'No recorded decision');
   text('nav-metric',money(portfolio.last_mark?.nav));text('nav-date',portfolio.last_mark?`Recorded ${portfolio.last_mark.session} · simulated`:'No recorded NAV mark');
   text('heartbeat-metric',health.healthy?'Healthy':heartbeat==='missing'?'Not started':heartbeat[0].toUpperCase()+heartbeat.slice(1));
-  text('heartbeat-date',health.age_seconds!==null?`${Math.max(0,Math.round(health.age_seconds))}s since update${health.issues?.length?' · '+health.issues.join('; '):''}`:'No heartbeat file');
+  text('heartbeat-date',`${health.age_seconds!==null?Math.max(0,Math.round(health.age_seconds))+'s since update':'No valid heartbeat update'}${health.issues?.length?' · '+health.issues.join('; '):''}`);
   tag('env-tag',environment.ready,environment.ready?'Ready':'Needs attention');text('env-info',`Python ${environment.python_version} · Bash ${environment.bash_present?'available':'missing'}. ${environment.ready?'Project scripts found.':'Check this checkout and install Python 3.11+ / Bash.'}`);
   tag('keys-tag',credentials.present,credentials.present?'File found':'Missing');text('keys-info',`Local file: ${credentials.path}. ${credentials.present?'Existing keys are reused. Their values are not read into this page.':'Save your own Alpaca keys below.'}`);
   tag('study-tag',study.ready,study.ready?'Verified':'Needs attention');text('study-info',study.ready?`Authenticated ${study.feed.toUpperCase()} study: ${study.outcome}. No rerun needed.`:study.error||'Historical evidence is not ready.');
+  $('strategy-evidence').hidden=!study.ready||!study.settings;
+  $('strategy-results').replaceChildren();
+  if(study.ready&&study.settings){
+    const settings=study.settings,costs=settings.costs;
+    text('strategy-rule',`Daily SPY long/cash · selected SMA ${study.selected_lookback} sessions. Decisions use the prior session close; positions may last months.`);
+    text('strategy-risk',`Target allocation ${percent(settings.target_fraction)} · entry exposure cap ${percent(settings.max_position_fraction)} · peak drawdown entry halt ${percent(settings.max_drawdown)}. Whole shares, settled cash, no leverage or shorts. The drawdown halt blocks entries and permits eligible exits.`);
+    text('strategy-costs',`Base assumptions: half-spread ${costs.half_spread_bps} bps, slippage ${costs.slippage_bps} bps, impact ${costs.impact_bps} bps, sell fee ${costs.sell_fee_bps} bps; commission ${costs.commission_per_share}/share (minimum ${costs.minimum_commission}), exchange fee ${costs.exchange_fee_bps} bps. Higher-cost columns multiply all modeled costs.`);
+    for(const row of study.cost_scenarios){const tr=el('tr');tr.append(el('td',`${row.cost_multiplier}×`),el('td',`${percent(row.trend.total_return)} / ${percent(row.trend.maximum_drawdown)}`),el('td',`${percent(row.benchmark.total_return)} / ${percent(row.benchmark.maximum_drawdown)}`),el('td',`${row.trend.trade_count} / ${row.trend.rejection_count??'not recorded'}`));$('strategy-results').append(tr);}
+  }
   tag('book-tag',portfolio.ready,portfolio.ready?'Ready':'Needs attention');text('book-info',portfolio.ready?'Your existing simulated book is reused.':' '+(portfolio.error||'Choose starting simulated cash below.'));
   $('book-form').hidden=!!portfolio.book||!!history.total||!!history.error;
   text('setup-count',[environment.ready,credentials.present,study.ready,portfolio.ready].filter(Boolean).length+'/4');
@@ -86,7 +96,7 @@ function render(next){
   drawChart(rows);
   const eligible=latest?.fill_eligible;
   $('fill-form').hidden=!eligible;
-  text('fill-description',eligible?`Explicitly record the full ${latest.action} proposal: ${latest.quantity} SPY shares from ${latest.session}. Choose a simulated fill price and fees. Nothing is submitted to a broker.`:portfolio.accounting_pending?'A pending fill needs explicit recovery. Use Recover pending accounting; settlement and halt settings stay unchanged.':'No eligible unfilled proposal. Only the latest verified BUY/SELL can be recorded against its original book.');
+  text('fill-description',eligible?`Explicitly record the full ${latest.action} proposal: ${latest.quantity} SPY shares from ${latest.session}. Choose a simulated fill price and fees. Nothing is submitted to a broker.`:portfolio.accounting_pending?'A pending fill needs explicit recovery. Use Recover pending accounting; settlement and halt settings stay unchanged.':latest?.fill_error||'No eligible unfilled proposal. Only the latest verified BUY/SELL can be recorded against its original book.');
   if(eligible&&$('fill-form').elements.decision_id.value!==latest.decision_id){$('fill-form').elements.decision_id.value=latest.decision_id;$('fill-form').elements.price.value='';$('fill-form').elements.price.placeholder=latest.reference_price;$('fill-form').elements.fees.value=latest.detail?.proposal?.estimated_fees||'0';}
   text('job-tag',jobs.running?`${labels[jobs.action]} active`:jobs.external_runner?'External runner active':'No active job');
   $('job-list').replaceChildren();for(const job of [...jobs.recent].reverse()){const row=el('div',undefined,'job-row');row.append(el('span',labels[job.action]||job.action),el('small',`${job.started_at} · ${job.exit_code===null?'Active':job.stopped?'Stopped':job.exit_code===0?'Completed':'Exit '+job.exit_code}`));$('job-list').append(row);}
@@ -105,4 +115,5 @@ document.querySelectorAll('[data-page],[data-go]').forEach(button=>button.addEve
 document.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',()=>{const name=button.dataset.action;if(name==='study'&&!confirm('Download Alpaca historical data and run the study? Existing evidence and the original registry will be retained.'))return;if(name==='set_halt'&&!confirm('Set a manual global halt on all BUY and SELL proposals? This app does not clear risk halts.'))return;if(name==='settle_cash'&&!confirm('Confirm that the simulated sale proceeds have settled? Use the recovery control first if accounting is pending.'))return;action(name);}));
 for(const [id,name] of [['keys-form','save_keys'],['book-form','initialize_book'],['fill-form','record_fill']])$(id).addEventListener('submit',event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget));if(name==='save_keys')event.currentTarget.reset();if(name==='record_fill'&&!confirm('Record this full simulated fill exactly once? No broker order will be sent.'))return;action(name,data);});
 $('refresh').addEventListener('click',refresh);$('close-dialog').addEventListener('click',()=>$('decision-dialog').close());window.addEventListener('hashchange',()=>page(location.hash.slice(1)));
-(async()=>{page(location.hash.slice(1));try{token=(await request('/api/session')).token;await refresh();setInterval(refresh,5000);}catch(error){notice(error.message);}})();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&token)refresh();});
+(async()=>{page(location.hash.slice(1));try{token=(await request('/api/session')).token;await refresh();setInterval(()=>{if(!document.hidden)refresh();},5000);}catch(error){notice(error.message);}})();

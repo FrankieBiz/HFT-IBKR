@@ -30,6 +30,8 @@ if len(sys.argv)>1 and sys.argv[1].endswith('runner_lock.py'):
 if sys.argv[1:3] == ['-m', 'quant_session.readiness']:
     print('readiness error: missing historical evidence', file=sys.stderr)
     sys.exit(2)
+if sys.argv[1:3] == ['-m', 'quant_session.study_recovery']:
+    sys.exit(0)
 if sys.argv[1:2] == ['-'] and sys.argv[-1:] == ['registry-preflight']:
     sys.exit(0)
 if sys.argv[1:2] == ['-c']:
@@ -299,3 +301,170 @@ sys.exit(2)
         expectation = next(call for call in self.calls.read_text().splitlines() if '--expected-deadline' in call)
         deadline = datetime.fromisoformat(expectation.split('--expected-deadline ')[1])
         self.assertLessEqual((deadline-started).total_seconds(), 10)
+
+    def retry_fixture(self, *, failures=1, clocks=None, readiness_failure=0):
+        self.python.write_text('''#!/usr/bin/env python3
+import os, pathlib, sys
+root = pathlib.Path(__file__).parent
+with (root/'calls').open('a') as out:
+    out.write(' '.join(sys.argv[1:])+'\\n')
+def count(name):
+    p = root/name
+    n = int(p.read_text()) if p.exists() else 0
+    p.write_text(str(n+1))
+    return n
+if len(sys.argv)>1 and sys.argv[1].endswith('runner_lock.py'):
+    os.execv(sys.executable, [sys.executable, *sys.argv[1:]])
+if sys.argv[1:3] == ['-m', 'quant_session.health']:
+    sys.exit(0)
+if sys.argv[1:3] == ['-m', 'quant_session.readiness']:
+    n = count('readiness-count')+1
+    sys.exit(2 if n == READINESS_FAILURE else 0)
+if sys.argv[1:3] == ['-m', 'quant_session']:
+    n = count('clock-count')
+    rows = CLOCKS
+    state, day = rows[min(n, len(rows)-1)]
+    (root/'day').write_text(day)
+    print(state+' 0 31')
+    sys.exit(0)
+if sys.argv[1:2] == ['-c']:
+    print((root/'day').read_text())
+    sys.exit(0)
+if sys.argv[1:2] == ['-']:
+    sys.argv = sys.argv[1:]
+    exec(compile(sys.stdin.read(), '<retry fixture>', 'exec'))
+'''.replace('READINESS_FAILURE', repr(readiness_failure)).replace('CLOCKS', repr(clocks or [('open', '2026-10-07')])))
+        daily = self.root/'scripts/daily_shadow.sh'
+        daily.write_text('''#!/usr/bin/env bash
+set -eu
+n=0
+[[ ! -f attempts ]] || n=$(cat attempts)
+n=$((n+1))
+printf '%s' "$n" > attempts
+printf 'attempt %s\\n' "$n" >> calls
+(( n > FAILURES ))
+'''.replace('FAILURES', str(failures)))
+        daily.chmod(0o755)
+        bindir = self.root/'bin'
+        bindir.mkdir()
+        sleeper = bindir/'sleep'
+        sleeper.write_text('''#!/usr/bin/env python3
+import pathlib, sys
+with pathlib.Path(__file__).parent.parent.joinpath('calls').open('a') as out:
+    out.write('sleep '+' '.join(sys.argv[1:])+'\\n')
+sys.exit(2 if sys.argv[1] != '30' else 0)
+''')
+        sleeper.chmod(0o755)
+        self.env.update(PATH=str(bindir)+os.pathsep+self.env['PATH'], NTFY_TOPIC='')
+
+    def test_transient_daily_failure_retries_after_ten_minutes_in_same_session(self):
+        self.retry_fixture()
+        result = self.run_script('run_daily.sh')
+        calls = self.calls.read_text().splitlines()
+        self.assertEqual((self.root/'attempts').read_text(), '2', result.stdout+result.stderr)
+        first, second = calls.index('attempt 1'), calls.index('attempt 2')
+        between = calls[first+1:second]
+        self.assertEqual(sum(int(row.split()[1]) for row in between if row.startswith('sleep ')), 600)
+        self.assertTrue(any('quant_session.readiness' in row for row in between))
+        self.assertTrue(any('market-clock' in row for row in between))
+        sleeping = [i for i in range(first+1, second) if calls[i].startswith('sleep ')]
+        self.assertTrue(all('--status failed' in calls[i-1] for i in sleeping))
+
+    def test_daily_retry_exhaustion_is_bounded_and_keeps_failed_health(self):
+        self.retry_fixture(failures=100)
+        result = self.run_script('run_daily.sh')
+        self.assertEqual((self.root/'attempts').read_text(), '3', result.stdout+result.stderr)
+        calls = self.calls.read_text().splitlines()
+        self.assertIn('--status failed', calls[-1])
+        self.assertNotIn('--status ok', '\n'.join(calls))
+
+    def test_daily_once_fails_fast_without_retry_sleep(self):
+        self.retry_fixture(failures=100)
+        result = self.run_script('run_daily.sh', '--once')
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual((self.root/'attempts').read_text(), '1')
+        self.assertNotIn('sleep ', self.calls.read_text())
+
+    def test_daily_retry_stops_when_calendar_closes_or_new_york_day_changes(self):
+        for rows in ([('open', '2026-10-07'), ('after', '2026-10-07')],
+                     [('open', '2026-10-07'), ('open', '2026-10-08')]):
+            with self.subTest(rows=rows):
+                for name in ('calls', 'attempts', 'clock-count', 'readiness-count'):
+                    (self.root/name).unlink(missing_ok=True)
+                shutil.rmtree(self.root/'bin', ignore_errors=True)
+                self.retry_fixture(failures=100, clocks=rows)
+                result = self.run_script('run_daily.sh')
+                self.assertEqual((self.root/'attempts').read_text(), '1', result.stdout+result.stderr)
+
+    def test_daily_retry_readiness_failure_precedes_calendar_and_attempt(self):
+        self.retry_fixture(failures=100, readiness_failure=3)
+        result = self.run_script('run_daily.sh')
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual((self.root/'attempts').read_text(), '1')
+        calls = self.calls.read_text().splitlines()
+        self.assertEqual(sum('market-clock' in row for row in calls), 1)
+        self.assertIn('--status failed', calls[-1])
+
+    def test_daily_committed_publication_recovers_before_credentials_or_input_regeneration(self):
+        import hashlib
+        import sys
+        from quant_research.__main__ import source_identity
+        from quant_research.config import parse_config
+        from quant_research.serde import canonical_json
+        from quant_session.inputs import parse_schedule, parse_snapshot
+        from quant_session.ledger import DecisionLedger
+        from test_shadow_readiness import evidence
+        from test_shadow_session import fixtures
+        for package in ('quant_research', 'quant_session', 'quant_data'):
+            shutil.copytree(ROOT/package, self.root/package)
+        study = self.root/'.research-output/spy-trend-v2'
+        study.mkdir(parents=True)
+        dataset, paths = evidence(study, real_bundle=True)
+        shared = self.root/'.research-output/spy-daily-v1'
+        shared.mkdir()
+        shutil.move(paths['registry.sqlite'], shared/'experiments.sqlite')
+        today = datetime.now(ZoneInfo('America/New_York')).date().isoformat()
+        day = self.root/'.research-output/shadow'/today
+        day.mkdir(parents=True)
+        shutil.copyfile(study/'spy.qdata', day/'spy.qdata')
+        _, _, schedule, snapshot = fixtures()
+        snapshot['execution_session'] = today
+        config_raw = json.loads(paths['config.json'].read_text())
+        config_raw['lookback'] = 2
+        for name, raw in (('config', config_raw), ('schedule', schedule), ('snapshot', snapshot)):
+            (day/(name+'.json')).write_text(canonical_json(raw))
+        hashes = {name: hashlib.sha256((day/(name+'.json')).read_bytes()).hexdigest()
+                  for name in ('config', 'schedule', 'snapshot')}
+        for package in ('quant_session', 'quant_research', 'quant_data'):
+            hashes[package+'_source'] = source_identity(folder=self.root/package, package=package)['source_sha256']
+        ledger = day.parent/'ledger.sqlite'
+        content = DecisionLedger(ledger).plan(dataset, parse_config(config_raw),
+            parse_schedule(schedule), parse_snapshot(snapshot), hashes)
+        originals = {name: (day/name).read_bytes() for name in ('spy.qdata', 'config.json', 'schedule.json', 'snapshot.json')}
+        ledger_before = ledger.read_bytes()
+        self.env.update(PYTHON=sys.executable, STUDY_DIR=str(study), NTFY_TOPIC='')
+        result = self.run_script('daily_shadow.sh')
+        self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
+        self.assertEqual((day/'plan.json').read_bytes(), content)
+        self.assertFalse(self.marker.exists())
+        for name, raw in originals.items():
+            self.assertEqual((day/name).read_bytes(), raw)
+        self.assertEqual(ledger.read_bytes(), ledger_before)
+        (day/'plan.json').unlink()
+        for name in ('config.json', 'schedule.json', 'snapshot.json', 'spy.qdata'):
+            (day/name).unlink()
+            result = self.run_script('daily_shadow.sh')
+            with self.subTest(name=name):
+                self.assertEqual(result.returncode, 2, result.stdout+result.stderr)
+                self.assertIn('review required', result.stderr)
+                self.assertFalse((day/name).exists(), 'originals must not be regenerated')
+                self.assertFalse((day/'plan.json').exists())
+                self.assertFalse(self.marker.exists())
+                self.assertEqual(ledger.read_bytes(), ledger_before)
+            (day/name).write_bytes(originals[name])
+        (self.root/'quant_session/recovery.py').write_text((self.root/'quant_session/recovery.py').read_text()+'\n')
+        result = self.run_script('daily_shadow.sh')
+        self.assertEqual(result.returncode, 2, result.stdout+result.stderr)
+        self.assertIn('identity mismatch', result.stderr)
+        self.assertFalse(self.marker.exists())
+        self.assertFalse((day/'plan.json').exists())

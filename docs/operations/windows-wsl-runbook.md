@@ -232,7 +232,13 @@ heartbeat alone is not proof that a daily decision arrived or the strategy works
 | Stale/future quote | Check network and WSL clock; invalid marks cannot alter observed risk memory. |
 | Conflicting/corrupt decision | Stop and retain inputs/ledger for investigation. |
 | Missing heartbeat/decision | Check PC sleep, process, inputs and log from the independent monitor. |
-| Output publication failed | Retry identical inputs to a fresh output path; committed decisions remain frozen. |
+| Output publication failed | Daily workflow restores missing report bytes from the committed decision after verifying original inputs; an explicit study run restores completed stored artifacts and registered selection. Mismatch or unfinished experiment stops for review. |
+
+The continuous daily runner retries failures up to three times, ten minutes apart,
+only within the same open session, with fresh calendar/evidence gates. `--once`
+fails fast. Failed health stays visible while waiting and after exhaustion.
+Setup displays authenticated strategy settings and held-out cost scenarios.
+Maintenance runs when requested; pull published updates before launching the app.
 
 Update code locally and rerun `make check build demo`. Research-source changes
 require evidence requalification; passing tests alone does not qualify old results.

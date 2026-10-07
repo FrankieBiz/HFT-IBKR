@@ -8,7 +8,7 @@ real-time quote is IEX's own best bid/offer: one venue, not the national best qu
 from datetime import datetime, time, timedelta, timezone
 
 from quant_data.alpaca import DATA_URL, NEW_YORK, _calendar_sessions, _decimal, _get_json
-from quant_research.serde import InputError, decimal_value, strict_keys, whole
+from quant_research.serde import InputError, decimal_value, fixed_decimal, strict_keys, whole
 
 QUOTE_TYPE = 'alpaca_iex_realtime'
 PORTFOLIO_KEYS = ('schema_version', 'cash', 'settled_cash', 'shares', 'peak_nav', 'halted')
@@ -43,13 +43,9 @@ def latest_quote(get):
     bid, ask = _decimal(quote.get('bp'), 'IEX bid'), _decimal(quote.get('ap'), 'IEX ask')
     if bid >= ask:
         raise InputError('IEX quote is crossed or locked; rerun in a moment')
-    stamp = quote['t'].replace('Z', '+00:00')
-    whole_seconds, _, rest = stamp.partition('.')
-    if rest:  # keep microseconds; Alpaca sends nanoseconds
-        digits = rest[:rest.index('+')] if '+' in rest else rest
-        stamp = f'{whole_seconds}.{digits[:6].ljust(6, "0")}+00:00'
     try:
-        as_of = datetime.fromisoformat(stamp)
+        # ISO parsing truncates nanoseconds to microseconds and keeps the offset.
+        as_of = datetime.fromisoformat(quote['t'])
     except ValueError as error:
         raise InputError(f'invalid IEX quote time: {quote["t"]}') from error
     if as_of.utcoffset() is None or as_of.utcoffset().total_seconds() != 0:
@@ -57,6 +53,7 @@ def latest_quote(get):
     return {'bid': format(bid, 'f'), 'ask': format(ask, 'f'), 'as_of': _utc(as_of), 'data_type': QUOTE_TYPE}
 
 
+@fixed_decimal
 def build_snapshot(portfolio, quote, now, today):
     """Mark the declared SIM book at the bid; the planner applies every gate."""
     strict_keys(portfolio, PORTFOLIO_KEYS, 'shadow portfolio')

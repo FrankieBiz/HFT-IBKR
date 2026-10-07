@@ -20,12 +20,13 @@ import tempfile
 
 from quant_research.serde import (InputError, _pairs, canonical_json, decimal_value,
                                   durable_sync, fixed_decimal, iso_date, strict_keys, whole)
-from quant_session.health import check_health
+from quant_session.health import check_health, _expectations
 from quant_session.inputs import parse_snapshot, read_document
 from quant_session.ledger import DecisionLedger
 from quant_session.live import PORTFOLIO_KEYS
 from quant_session.readiness import verify_readiness
 from .locking import operator_lock
+from .evidence import StudyEvidence
 
 
 TOKEN = re.compile(r'[A-Za-z0-9_-]{1,256}\Z')
@@ -120,6 +121,7 @@ class Service:
                             'protocol': study / 'protocol.json', 'selection': output / 'selection.json',
                             'holdout': output / 'holdout.json',
                             'registry': self.root / '.research-output/spy-daily-v1/experiments.sqlite'}
+        self.study_evidence = StudyEvidence(self.study_paths)
 
     def _reports(self):
         if not self.ledger_path.exists():
@@ -158,6 +160,17 @@ class Service:
 
     def _write_book(self, book):
         _atomic(self.portfolio_path, canonical_json(_book(book)).encode())
+
+    def _verify_fill_book(self, report, book):
+        raw, content = read_document(self.shadow / report['execution_session'] / 'snapshot.json')
+        if report['source_hashes'].get('snapshot') != hashlib.sha256(content).hexdigest():
+            raise InputError('The session snapshot differs from the verified source hash.')
+        snapshot = parse_snapshot(raw)
+        declared = snapshot['portfolio']
+        if snapshot['execution_session'].isoformat() != report['execution_session'] or any(
+            declared[field] != (Decimal(book[field]) if field in ('cash','settled_cash') else book[field])
+                for field in ('cash','settled_cash','shares','halted')):
+            raise InputError('The current book differs from the verified session snapshot; no fill applied.')
 
     @contextmanager
     def _journal(self, *, readonly=False):
@@ -254,12 +267,7 @@ class Service:
                        'python_version': '.'.join(map(str, sys.version_info[:3])), 'tools': tools,
                        'bash_present': shutil.which('bash') is not None}
         credentials = {'present': self.credentials_path.is_file(), 'path': str(self.credentials_path)}
-        study = {'ready': False, 'outcome': None, 'feed': None, 'error': None}
-        try:
-            verified = verify_readiness(**self.study_paths, require_alpaca_feed=True)
-            study.update(ready=True, outcome=verified['outcome'], feed=verified['price_feed'])
-        except InputError as error:
-            study['error'] = str(error)
+        study = self.study_evidence.snapshot(verifier=verify_readiness)
         history = {'rows': [], 'total': 0, 'error': None, 'present': self.ledger_path.exists()}
         reports = []
         try:
@@ -290,6 +298,13 @@ class Service:
         for index, report in enumerate(reports):
             proposal = report['proposal']
             state = states.get(report['decision_id'])
+            eligible = index == 0 and proposal is not None and state is None and portfolio['ready']
+            fill_error = None
+            if eligible:
+                try:
+                    self._verify_fill_book(report, portfolio['book'])
+                except InputError as error:
+                    eligible, fill_error = False, str(error)
             history['rows'].append({'session': report['execution_session'],
                 'action': proposal['side'] if proposal else report['status'],
                 'quantity': proposal['quantity'] if proposal else 0,
@@ -300,7 +315,7 @@ class Service:
                 'decision_id': report['decision_id'], 'mark_valid': report['risk_memory']['mark_valid'],
                 'filled': state == 'applied', 'fill_state': state, 'detail': report,
                 'latest': index == 0,
-                'fill_eligible': index == 0 and proposal is not None and state is None and portfolio['ready']})
+                'fill_eligible': eligible, 'fill_error': fill_error})
         if reports:
             portfolio['entry_halted'] = reports[0]['risk_memory']['entry_halted']
             mark = next((report for report in reports if report['risk_memory']['mark_valid']), None)
@@ -311,13 +326,14 @@ class Service:
         health = check_health(self.heartbeat_path, self.ledger_path)
         health.update(status='missing', updated_at=None, age_seconds=None, expected_session=None, expected_deadline=None)
         if self.heartbeat_path.exists():
+            health['status'] = 'invalid'
             try:
                 heartbeat = read_document(self.heartbeat_path)[0]
-                if isinstance(heartbeat, dict):
-                    for key in ('status', 'updated_at', 'expected_session', 'expected_deadline'):
-                        health[key] = heartbeat.get(key)
-                    instant = datetime.fromisoformat(heartbeat['updated_at'])
-                    health['age_seconds'] = (datetime.now(timezone.utc) - instant).total_seconds()
+                _expectations(heartbeat)
+                instant = datetime.fromisoformat(heartbeat['updated_at'])
+                for key in ('status', 'updated_at', 'expected_session', 'expected_deadline'):
+                    health[key] = heartbeat[key]
+                health['age_seconds'] = (datetime.now(timezone.utc) - instant).total_seconds()
             except (InputError, KeyError, ValueError, TypeError):
                 pass
         return {'mode': 'offline_shadow', 'generated_at': _now(), 'environment': environment,
@@ -379,15 +395,7 @@ class Service:
             if report['status'] != 'PROPOSED' or not proposal or proposal['side'] not in ('BUY','SELL'):
                 raise InputError('A verified BUY or SELL proposal is required.')
             before = self._read_book()
-            raw, content = read_document(self.shadow / report['execution_session'] / 'snapshot.json')
-            if report['source_hashes'].get('snapshot') != hashlib.sha256(content).hexdigest():
-                raise InputError('The session snapshot differs from the verified source hash.')
-            snapshot = parse_snapshot(raw)
-            declared = snapshot['portfolio']
-            if snapshot['execution_session'].isoformat() != report['execution_session'] or any(
-                declared[field] != (Decimal(before[field]) if field in ('cash','settled_cash') else before[field])
-                    for field in ('cash','settled_cash','shares','halted')):
-                raise InputError('The current book differs from the verified session snapshot; no fill applied.')
+            self._verify_fill_book(report, before)
             quantity = whole(proposal['quantity'], 'proposal quantity')
             after = self._preserve_risk(_fill_book(before, proposal['side'], quantity, price, fees), reports)
             with self._journal() as connection:

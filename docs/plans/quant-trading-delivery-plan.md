@@ -1,12 +1,20 @@
 # Quant trading delivery plan
 
-Updated 2026-10-06. **Current direction: a bounded daily SPY trend overlay, with
+Updated 2026-10-07. **Current direction: a bounded daily SPY trend overlay, with
 research evidence and durable entry-risk controls before operational shadowing.**
 The [October 6 design](../superpowers/specs/2026-10-06-robust-trend-design.md) and
 [implementation plan](../superpowers/plans/2026-10-06-robust-trend.md) supersede
 earlier sequencing. The HFT/order-flow branch is closed; AI, framework migration,
 crypto/FX, grid and DCA remain deferred until incremental economic evidence exists.
 The original proposal and earlier research decisions remain historical context.
+
+The [October 7 reliability scope](../superpowers/specs/2026-10-07-reliability.md)
+preserves frozen research/config/protocol identities and existing history. It
+repairs quote/NAV inputs, app eligibility/health reporting, bounded daily retries
+and interrupted publication recovery, and exposes verified strategy evidence.
+Study display verification is content cached; operational gates remain fresh.
+Maintenance is on demand whenever requested, with tested commits, GitHub pushes
+and documentation updates; no unattended maintenance schedule is installed.
 
 The revised [spy-trend-v2 protocol](../../studies/spy-trend-v2/PROTOCOL.md) uses a
 25% entry target, 30% entry exposure cap and 10% drawdown halt on new buys. These

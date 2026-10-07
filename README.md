@@ -29,8 +29,24 @@ The five tabs are Overview, Setup, Decisions, Portfolio and Activity. Setup reus
 existing keys, completed study evidence and the manual book. Opening the app starts
 no jobs or downloads. Use **Start runner** when ready; **Stop** stops an app-owned
 job. A runner started in another terminal must be stopped in that terminal.
+Setup also shows the authenticated selected SMA, allocation/risk settings and
+held-out trend/benchmark results at 1x/2x/5x modeled costs. These are historical
+simulations, not demonstrated profits. Fill controls verify that the original
+decision snapshot still matches your book before offering a simulated fill.
 Preserve `.research-output/`, study registries and ledgers; do not rerun a completed
 study to install the app or repair a recent-SIP download error.
+
+Failed daily decisions get up to three attempts, ten minutes apart, while the
+same market session remains open. Calendar and evidence gates run before retries;
+`--once` still fails immediately. Interrupted report publication can recover the
+original stored decision or completed study artifacts without repeating research.
+Unfinished experiments, missing original inputs and mismatches require review.
+
+Maintenance is **on demand, whenever you ask**: changes are verified, committed
+and pushed with documentation updates. The app does not silently update itself
+or schedule unattended code changes. Pull updates in WSL with the commands above.
+The [October 7 verification notes](docs/research/2026-10-07-reliability-validation.md)
+record the checks, fixture performance comparison and remaining limits.
 
 Python 3.11+ and WSL/Ubuntu or another POSIX checkout are required. The app uses the
 Python standard library and bundled browser assets; no npm install or CDN is

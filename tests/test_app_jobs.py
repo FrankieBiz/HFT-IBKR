@@ -39,6 +39,13 @@ class JobTests(unittest.TestCase):
                 self.jobs.start(action)
         self.assertFalse(self.jobs.snapshot()['running'])
 
+    def test_offline_checks_ignore_malformed_provider_credentials(self):
+        (self.home/'alpaca/paper.env').write_text('malformed saved keys\n')
+        self.jobs.start('checks')
+        self.finish()
+        self.assertEqual(self.jobs.snapshot()['exit_code'], 0)
+        self.assertEqual(self.jobs.secrets, ())
+
     def test_failure_and_secrets_are_redacted_and_logs_bounded(self):
         self.script('run_daily.sh', 'echo FAKESECRET123 FAKESECRET456\nprintf "%09000d\\n" 1\nexit 7\n')
         self.jobs.start('setup_check')

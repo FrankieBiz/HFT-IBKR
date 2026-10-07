@@ -1,5 +1,5 @@
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN, ROUND_HALF_EVEN, ROUND_UP, localcontext
 import io
 import json
 from pathlib import Path
@@ -72,6 +72,18 @@ class LiveInputTests(unittest.TestCase):
             with self.subTest(bid=bid, ask=ask), self.assertRaises(InputError):
                 latest_quote(fake_alpaca(bid=bid, ask=ask))
 
+    def test_fractional_quote_time_requires_original_utc_offset(self):
+        for offset in ('+05:30', '-04:00', '+00:01', '-00:01', ''):
+            stamp = f'2025-01-09T14:35:00.123456789{offset}'
+            with self.subTest(stamp=stamp), self.assertRaisesRegex(InputError, 'must be UTC'):
+                latest_quote(fake_alpaca(stamp=stamp))
+
+    def test_nanosecond_utc_quote_time_keeps_microsecond_precision(self):
+        for offset in ('Z', '+00:00'):
+            with self.subTest(offset=offset):
+                quote = latest_quote(fake_alpaca(stamp=f'2025-01-09T14:35:00.123456789{offset}'))
+                self.assertEqual(quote['as_of'], '2025-01-09T14:35:00.123456+00:00')
+
     def test_schedule_spans_bundle_to_today_in_utc(self):
         schedule = build_schedule(CALENDAR, date(2025, 1, 2), date(2025, 1, 9), '2025-01-09T14:00:00+00:00')
         self.assertEqual(schedule['sessions'][-1], {'session': '2025-01-09', 'open_at': '2025-01-09T14:30:00+00:00',
@@ -93,6 +105,20 @@ class LiveInputTests(unittest.TestCase):
                 build_snapshot(bad, quote, NOW, date(2025, 1, 9))
         with self.assertRaises(InputError):
             parse_snapshot(build_snapshot(dict(PORTFOLIO, settled_cash='20000'), quote, NOW, date(2025, 1, 9)))
+
+    def test_snapshot_is_independent_of_decimal_precision_and_rounding(self):
+        quote = latest_quote(fake_alpaca(bid='123456.123456789012', ask='123456.13'))
+        held = dict(PORTFOLIO, cash='1000.123456789012', settled_cash='800', shares=999999999999)
+        with localcontext() as context:
+            context.prec, context.rounding = 28, ROUND_HALF_EVEN
+            expected = build_snapshot(held, quote, NOW, date(2025, 1, 9))
+        self.assertEqual(expected['portfolio']['nav'], '123456123456666556.0000000000')
+        for precision, rounding in ((6, ROUND_HALF_EVEN), (28, ROUND_UP), (40, ROUND_DOWN)):
+            with self.subTest(precision=precision, rounding=rounding), localcontext() as context:
+                context.prec, context.rounding = precision, rounding
+                actual = build_snapshot(held, quote, NOW, date(2025, 1, 9))
+                self.assertEqual(actual, expected)
+                self.assertEqual((context.prec, context.rounding), (precision, rounding))
 
     def test_closed_market_records_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:

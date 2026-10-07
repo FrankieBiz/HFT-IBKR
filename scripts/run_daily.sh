@@ -63,6 +63,9 @@ wait_with_heartbeat() {
   done
   heartbeat "$RUNNER_STATUS"
 }
+session_today() {
+  "$PYTHON" -c 'from datetime import datetime; from zoneinfo import ZoneInfo; print(datetime.now(ZoneInfo("America/New_York")).date())'
+}
 expected_today() {
   local session deadline
   read -r session deadline < <("$PYTHON" - "$run_in" "$state" <<'PY'
@@ -75,7 +78,9 @@ print(now.astimezone(ZoneInfo('America/New_York')).date(),
       (now + timedelta(seconds=delay)).isoformat())
 PY
 )
-  heartbeat waiting --expected-session "$session" --expected-deadline "$deadline"
+  local status=waiting
+  [[ $RUNNER_STATUS != failed ]] || status=failed
+  heartbeat "$status" --expected-session "$session" --expected-deadline "$deadline"
 }
 
 if [[ $MODE == --check ]]; then
@@ -84,6 +89,7 @@ if [[ $MODE == --check ]]; then
   exit 0
 fi
 notify 'Shadow runner started' 'Historical evidence verified; waiting for the session.'
+handled_session=
 while true; do
   # Recheck source/evidence before each external calendar read and notification.
   readiness >/dev/null
@@ -96,16 +102,44 @@ while true; do
   fi
   case $state in
     open)
-      expected_today
-      wait_with_heartbeat "$run_in"
-      heartbeat running
-      if out=$(./scripts/daily_shadow.sh 2>&1); then
-        heartbeat ok
-        notify "Today's shadow decision" "$(tail -n 8 <<<"$out")"
-      else
-        heartbeat failed
-        notify 'Daily run FAILED' "$(tail -n 8 <<<"$out")"
-        [[ $MODE != --once ]] || exit 2
+      current_session=$(session_today)
+      if [[ $handled_session != "$current_session" ]]; then
+        target_session=$current_session
+        expected_today
+        wait_with_heartbeat "$run_in"
+        # The scheduled delay can cross a close or a New York date boundary.
+        if (( run_in > 0 )); then
+          readiness >/dev/null
+          if ! clock_read; then heartbeat failed; exit 2; fi
+          current_session=$(session_today)
+        fi
+        if [[ $state == open && $current_session == "$target_session" ]] && (( run_in == 0 )); then
+          handled_session=$target_session
+          for attempt in 1 2 3; do
+            if (( attempt > 1 )); then
+              # Keep the failed heartbeat visible throughout the retry delay.
+              wait_with_heartbeat 600
+              readiness >/dev/null
+              if ! clock_read; then
+                heartbeat failed
+                notify 'Calendar check FAILED' 'Daily retries stopped; see local log.'
+                break
+              fi
+              current_session=$(session_today)
+              [[ $state == open && $current_session == "$target_session" ]] && (( run_in == 0 )) || break
+            fi
+            heartbeat running
+            if out=$(./scripts/daily_shadow.sh 2>&1); then
+              heartbeat ok
+              notify "Today's shadow decision" "$(tail -n 8 <<<"$out")"
+              break
+            else
+              heartbeat failed
+              notify 'Daily run FAILED' "$(tail -n 8 <<<"$out")"
+              [[ $MODE != --once ]] || exit 2
+            fi
+          done
+        fi
       fi
       ;;
     closed) notify 'Market closed today' 'No session today; waiting until tomorrow morning.' ;;

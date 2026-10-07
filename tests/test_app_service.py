@@ -60,6 +60,60 @@ class ServiceTests(unittest.TestCase):
         self.assertFalse(self.shadow.exists())
         self.assertFalse(self.home.exists())
 
+    def test_fill_eligibility_tracks_original_book_and_snapshot(self):
+        report = self.proposal()
+        self.assertTrue(self.service.snapshot()['history']['rows'][0]['fill_eligible'])
+        self.service.set_halt({})
+        status = self.service.snapshot()
+        self.assertFalse(status['history']['rows'][0]['fill_eligible'])
+        self.assertIn('snapshot', status['history']['rows'][0]['fill_error'])
+        with self.assertRaises(InputError):
+            self.service.record_fill({'decision_id': report['decision_id'], 'price': '102', 'fees': '0'})
+
+    def test_malformed_heartbeat_is_not_projected_as_a_status(self):
+        self.shadow.mkdir(parents=True)
+        heartbeat = {'schema_version': 1, 'status': 123, 'updated_at': '2026-10-07T14:00:00+00:00',
+                     'expected_session': None, 'expected_deadline': None}
+        self.service.heartbeat_path.write_text(canonical_json(heartbeat))
+        status = self.service.snapshot()['health']
+        self.assertFalse(status['healthy'])
+        self.assertEqual(status['status'], 'invalid')
+
+    def test_fill_eligibility_rejects_missing_and_changed_snapshot(self):
+        report = self.proposal()
+        path = self.shadow/str(report['execution_session'])/'snapshot.json'
+        original = path.read_bytes()
+        for content in (None, b'{}'):
+            if content is None:
+                path.unlink()
+            else:
+                path.write_bytes(content)
+            row = self.service.snapshot()['history']['rows'][0]
+            self.assertFalse(row['fill_eligible'])
+            self.assertTrue(row['fill_error'])
+        path.write_bytes(original)
+        self.assertTrue(self.service.snapshot()['history']['rows'][0]['fill_eligible'])
+
+    def test_cash_settlement_after_proposal_disables_fill(self):
+        report = self.proposal(sells=True)
+        path = self.shadow/str(report['execution_session'])/'snapshot.json'
+        raw = read_json(path)
+        raw['portfolio']['settled_cash'] = '9000'
+        content = canonical_json(raw).encode()
+        path.write_bytes(content)
+        book = read_json(self.book)
+        book['settled_cash'] = '9000'
+        self.book.write_text(canonical_json(book))
+        report['source_hashes']['snapshot'] = hashlib.sha256(content).hexdigest()
+        from quant_session.planner import decision_digest
+        report['decision_id'] = decision_digest(report)
+        # Replace this invented rehearsal ledger; real histories are never reset.
+        self.service.ledger_path.unlink()
+        DecisionLedger(self.service.ledger_path).record(report, 'fixture')
+        self.assertTrue(self.service.snapshot()['history']['rows'][0]['fill_eligible'])
+        self.service.settle_cash({})
+        self.assertFalse(self.service.snapshot()['history']['rows'][0]['fill_eligible'])
+
     def test_save_keys_simple_alphabet_permissions_and_no_values_in_result_or_status(self):
         fake = {'key_id': 'FAKE_key-123', 'secret_key': 'FAKE_secret-456'}
         result = self.service.save_keys(fake)

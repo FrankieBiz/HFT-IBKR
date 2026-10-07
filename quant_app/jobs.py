@@ -101,7 +101,7 @@ class JobManager:
             try:
                 secrets = []
                 keyfile = self.config_home/'alpaca/paper.env'
-                if keyfile.exists():
+                if action != 'checks' and keyfile.exists():
                     if keyfile.stat().st_size > 8192:
                         raise InputError('Credential file is too large; review it locally.')
                     for line in keyfile.read_text().splitlines():

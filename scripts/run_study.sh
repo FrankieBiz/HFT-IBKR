@@ -45,6 +45,8 @@ except (InputError, sqlite3.Error) as error:
     print(f'study registry error: {error}', file=sys.stderr)
     sys.exit(2)
 PYREG
+"$PYTHON" -m quant_session.study_recovery --bundle "$D/spy.qdata" --config "$S/config.json" \
+  --protocol "$S/protocol.json" --registry "$STUDY_REGISTRY" --output "$D"
 ALPACA_ENV=${ALPACA_ENV:-$HOME/.config/alpaca/paper.env}
 if [[ ! -d $D/alpaca && -z ${APCA_API_KEY_ID:-} && -f $ALPACA_ENV ]]; then
   set -a

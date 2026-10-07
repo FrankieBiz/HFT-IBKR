@@ -21,6 +21,16 @@ today = datetime.now(ZoneInfo("America/New_York")).date()
 print(today, today - timedelta(days=1))')
 DAY=$ROOT/$TODAY
 mkdir -p "$DAY"
+PLANNING_CONFIG=${CONFIG:-$DAY/config.json}
+if [[ ! -f $DAY/plan.json ]]; then
+  # Committed publication precedes creating selected config or replacing live inputs.
+  "$PYTHON" -m quant_session.recovery --ledger "$ROOT/ledger.sqlite" --session "$TODAY" \
+    --bundle "$DAY/spy.qdata" --config "$PLANNING_CONFIG" --schedule "$DAY/schedule.json" \
+    --snapshot "$DAY/snapshot.json" --output "$DAY/plan.json" \
+    --study-bundle "$STUDY_OUTPUT/spy.qdata" --study-config "$STUDY_DIR/config.json" \
+    --protocol "$STUDY_DIR/protocol.json" --selection "$STUDY_OUTPUT/selection.json" \
+    --holdout "$STUDY_OUTPUT/holdout.json" --registry "$STUDY_REGISTRY" >/dev/null
+fi
 readiness "$DAY/config.json" >/dev/null
 [[ -n $CONFIG ]] || CONFIG=$DAY/config.json
 if [[ -f $DAY/spy.qdata ]]; then
